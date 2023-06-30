@@ -1,5 +1,5 @@
 
-proxy_includes = include_directories(['../include','../include/stdexec/include/'])
+proxy_includes = include_directories(['../include','../include/stdexec/include/','include'])
 jsondep=dependency('nlohmann_json')
 executable(
   'reverseproxy',
