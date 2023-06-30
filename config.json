@@ -21,6 +21,12 @@
         "path": "/redfish/v1/",
         "type": "generic_forwarder",
         "ip": "localhost",
-        "port": "443"
+        "port": "https"
+    },
+    {
+        "path": "/",
+        "type": "secure_generic_forwarder",
+        "ip": "www.google.com",
+        "port": "https"
     }
 ]
