@@ -1,0 +1,14 @@
+[
+    {
+        "path": "/hello",
+        "type": "generic_forwarder",
+        "ip": "localhost",
+        "port": "8082"
+    },
+    {
+        "path": "/tmp.txt",
+        "type": "file_forwarder",
+        "ip": "localhost",
+        "port": "8082"
+    }
+]
