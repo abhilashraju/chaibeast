@@ -10,3 +10,4 @@ project(
 openssl_dep = dependency('openssl', version: '>=1.1.1')
 boost_dep = dependency('boost')
 subdir('reverseproxy')
+subdir('fileserver')
