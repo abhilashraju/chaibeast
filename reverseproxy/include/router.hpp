@@ -85,6 +85,7 @@ struct Router {
   AbstractForwarder *get(const std::string &path) const {
 
     if (auto matched = wildCardMatch(path); matched != nullptr) {
+      std::cout << "found matching wildcard for " << path;
       return matched;
     }
     if (const auto &iter = table.find(path); iter != end(table)) {

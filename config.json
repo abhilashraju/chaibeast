@@ -25,11 +25,10 @@
         "default": true
     },
     {
-        "path": "/redfish/v1/Systems/system/LogServices/Dump/Entries",
-        "type": "generic_forwarder",
+        "path": "/redfish/v1/Systems/system/LogServices/Dump/*",
+        "type": "secure_file_forwarder",
         "ip": "localhost",
-        "port": "8082",
-        "default": true
+        "port": "8082"
     },
     {
         "path": "/",
