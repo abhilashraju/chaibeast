@@ -19,9 +19,10 @@
     },
     {
         "path": "/redfish/v1/",
-        "type": "generic_forwarder",
-        "ip": "localhost",
-        "port": "https"
+        "type": "secure_generic_forwarder",
+        "ip": "rain104bmc.aus.stglabs.ibm.com",
+        "port": "https",
+        "default": true
     },
     {
         "path": "/",

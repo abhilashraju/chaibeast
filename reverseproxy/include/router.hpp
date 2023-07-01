@@ -41,9 +41,8 @@ struct Router {
       std::unordered_map<std::string, std::unique_ptr<AbstractForwarder>>;
   Map table;
   std::unique_ptr<AbstractForwarder> defaultForwarder;
-  Router(const std::string &dip, const std::string &dp,
-         const std::string &config) {
-    defaultForwarder.reset(new GenericForwarder{dip, dp});
+  Router(const std::string &config) {
+
     std::ifstream i(config);
     nlohmann::json routdef;
     i >> routdef;
@@ -55,6 +54,11 @@ struct Router {
         addRoute(r["path"].get<std::string>(),
                  std::move(makeForwader(r["ip"].get<std::string>(),
                                         r["port"].get<std::string>())));
+        if (!r["default"].is_null() && r["default"].get<bool>()) {
+          defaultForwarder.reset(makeForwader(r["ip"].get<std::string>(),
+                                              r["port"].get<std::string>())
+                                     .release());
+        }
       }
     }
   }
