@@ -17,88 +17,94 @@ struct AbstractForwarder {
              http::request<http::dynamic_body> &request) const = 0;
   virtual ~AbstractForwarder(){};
 };
-struct GenericForwarder : AbstractForwarder {
+
+template <typename StreamBuilder, typename BodyReader>
+struct GenericForwarderImpl : AbstractForwarder {
   std::string target;
   std::string port;
-  ~GenericForwarder() {}
-  GenericForwarder(const std::string &t, const std::string &p)
+  StreamBuilder streamBuilder;
+  ~GenericForwarderImpl() {}
+  GenericForwarderImpl(const std::string &t, const std::string &p)
       : target(t), port(p) {}
   beast::error_code
   operator()(tcp::socket &clientSocket,
              http::request<http::dynamic_body> &request) const {
     net::io_context ioContext;
-    tcp::socket serverSocket(ioContext);
-    tcp::resolver resolver(ioContext);
-    const auto results = resolver.resolve(target.data(), port.data());
-    net::connect(serverSocket, results.begin(), results.end());
-
+    auto forwarderStream = streamBuilder.beginStream(ioContext, target, port);
     // Forward the request to the target server
-    http::write(serverSocket, request);
-
+    http::write(forwarderStream, request);
+    beast::error_code ec{};
+    auto res = BodyReader::read(forwarderStream, ec);
     // Receive the response from the target server
-    beast::flat_buffer serverBuffer;
-    http::file_body::value_type file;
-    beast::error_code ec;
-
-    http::response<http::dynamic_body> res{};
-    http::read(serverSocket, serverBuffer, res, ec);
-    if (ec) {
-      // http::write(clientSocket, tresp, ec);
-      return ec;
-    }
     http::write(clientSocket, res, ec);
+    streamBuilder.endStream(forwarderStream, ec);
     return ec;
   }
 };
-
-struct FileRequestForwarder : AbstractForwarder {
-  std::string target;
-  std::string port;
-  ~FileRequestForwarder() {}
-  FileRequestForwarder(const std::string &t, const std::string &p)
-      :
-
-        target(t), port(p) {}
-
-  beast::error_code
-  operator()(tcp::socket &clientSocket,
-             http::request<http::dynamic_body> &request) const {
-    net::io_context ioContext;
-    tcp::resolver resolver(ioContext);
-    const auto results = resolver.resolve(target.data(), port.data());
-    tcp::socket forwardingSocket(ioContext);
-    net::connect(forwardingSocket, results.begin(), results.end());
-
-    // Forward the request to the target server
-    http::write(forwardingSocket, request);
-
-    // Receive the response from the target server
+struct DynamicBodyReader {
+  static auto read(auto &stream, beast::error_code &ec) {
+    beast::flat_buffer serverBuffer;
+    http::response<http::dynamic_body> res{};
+    http::read(stream, serverBuffer, res, ec);
+    return res;
+  }
+};
+struct FileBodyReader {
+  static auto read(auto &stream, beast::error_code &ec) {
     beast::flat_buffer serverBuffer;
     http::file_body::value_type file;
-    beast::error_code ec;
-
-    file.open("tmp", beast::file_mode::write, ec);
-    if (ec) {
-      return ec;
-    }
-
     http::response<http::file_body> res{std::piecewise_construct,
                                         std::make_tuple(std::move(file))};
+    file.open("tmp", beast::file_mode::write, ec);
+    if (ec) {
+      return res;
+    }
     http::response_parser<http::file_body> parser{std::move(res)};
-
     parser.body_limit((std::numeric_limits<std::uint64_t>::max)());
-    http::read(forwardingSocket, serverBuffer, parser);
-
+    http::read(stream, serverBuffer, parser);
     // Forward the response to the client
     auto tresp = parser.release();
     tresp.body().seek(0, ec);
-    if (ec) {
-      // http::write(clientSocket, tresp, ec);
-      return ec;
-    }
-    http::write(clientSocket, tresp, ec);
-    return ec;
+    return res;
   }
+};
+// template <typename StreamBuilder>
+// struct FileRequestForwarderImpl : AbstractForwarder {
+//   std::string target;
+//   std::string port;
+//   StreamBuilder streamBuilder;
+//   ~FileRequestForwarderImpl() {}
+//   FileRequestForwarderImpl(const std::string &t, const std::string &p)
+//       : target(t), port(p) {}
+
+//   beast::error_code
+//   operator()(tcp::socket &clientSocket,
+//              http::request<http::dynamic_body> &request) const {
+//     net::io_context ioContext;
+//     auto forwarderStream = streamBuilder.beginStream(ioContext, target,
+//     port);
+
+//     // Forward the request to the target server
+//     http::write(forwarderStream, request);
+//     beast::error_code ec{};
+//     // Receive the response from the target server
+//     auto resp = FileBodyReader::read(forwarderStream, ec);
+//     http::write(clientSocket, resp, ec);
+//     streamBuilder.endStream(forwarderStream, ec);
+//     return ec;
+//   }
+// };
+struct TcpSocketBuilder {
+  auto beginStream(net::io_context &ioContext, const std::string &target,
+                   const std::string &port) const {
+
+    tcp::socket forwardingSocket(ioContext);
+    tcp::resolver resolver(ioContext);
+    const auto results = resolver.resolve(target.data(), port.data());
+    net::connect(forwardingSocket, results.begin(), results.end());
+    return forwardingSocket;
+  }
+  auto endStream(auto &forwardingSocket, beast::error_code &ec) const {}
 };
 namespace ssl = boost::asio::ssl;
 
@@ -123,83 +129,91 @@ struct SSlStreamBuilder {
     stream.shutdown(ec);
   }
 };
-struct SecureGenericForwarder : AbstractForwarder {
-  std::string target;
-  std::string port;
-  SSlStreamBuilder streamBuilder;
-  ~SecureGenericForwarder() {}
-  SecureGenericForwarder(const std::string &t, const std::string &p)
-      : target(t), port(p) {}
-  beast::error_code
-  operator()(tcp::socket &clientSocket,
-             http::request<http::dynamic_body> &request) const {
-    net::io_context ioContext;
-    auto stream = streamBuilder.beginStream(ioContext, target, port);
-    // Forward the request to the target server
-    http::write(stream, request);
+using GenericForwarder =
+    GenericForwarderImpl<TcpSocketBuilder, DynamicBodyReader>;
+using FileRequestForwarder =
+    GenericForwarderImpl<TcpSocketBuilder, FileBodyReader>;
+using SecureGenericForwarder =
+    GenericForwarderImpl<SSlStreamBuilder, DynamicBodyReader>;
+using SecureFileRequestForwarder =
+    GenericForwarderImpl<SSlStreamBuilder, FileBodyReader>;
+// struct SecureGenericForwarder : AbstractForwarder {
+//   std::string target;
+//   std::string port;
+//   SSlStreamBuilder streamBuilder;
+//   ~SecureGenericForwarder() {}
+//   SecureGenericForwarder(const std::string &t, const std::string &p)
+//       : target(t), port(p) {}
+//   beast::error_code
+//   operator()(tcp::socket &clientSocket,
+//              http::request<http::dynamic_body> &request) const {
+//     net::io_context ioContext;
+//     auto stream = streamBuilder.beginStream(ioContext, target, port);
+//     // Forward the request to the target server
+//     http::write(stream, request);
 
-    // Receive the response from the target server
-    beast::flat_buffer serverBuffer;
-    http::file_body::value_type file;
-    beast::error_code ec;
+//     // Receive the response from the target server
+//     beast::flat_buffer serverBuffer;
+//     http::file_body::value_type file;
+//     beast::error_code ec;
 
-    http::response<http::dynamic_body> res{};
-    http::read(stream, serverBuffer, res, ec);
-    if (ec) {
-      // http::write(clientSocket, tresp, ec);
-      return ec;
-    }
-    http::write(clientSocket, res, ec);
-    streamBuilder.endStream(stream, ec);
-    return ec;
-  }
-};
-struct SecureFileRequestForwarder : AbstractForwarder {
-  std::string target;
-  std::string port;
-  SSlStreamBuilder streamBuilder;
-  ~SecureFileRequestForwarder() {}
-  SecureFileRequestForwarder(const std::string &t, const std::string &p)
-      :
+//     http::response<http::dynamic_body> res{};
+//     http::read(stream, serverBuffer, res, ec);
+//     if (ec) {
+//       // http::write(clientSocket, tresp, ec);
+//       return ec;
+//     }
+//     http::write(clientSocket, res, ec);
+//     streamBuilder.endStream(stream, ec);
+//     return ec;
+//   }
+// };
+// struct SecureFileRequestForwarder : AbstractForwarder {
+//   std::string target;
+//   std::string port;
+//   SSlStreamBuilder streamBuilder;
+//   ~SecureFileRequestForwarder() {}
+//   SecureFileRequestForwarder(const std::string &t, const std::string &p)
+//       :
 
-        target(t), port(p) {}
+//         target(t), port(p) {}
 
-  beast::error_code
-  operator()(tcp::socket &clientSocket,
-             http::request<http::dynamic_body> &request) const {
+//   beast::error_code
+//   operator()(tcp::socket &clientSocket,
+//              http::request<http::dynamic_body> &request) const {
 
-    net::io_context ioContext;
-    auto stream = streamBuilder.beginStream(ioContext, target, port);
-    // Forward the request to the target server
-    http::write(stream, request);
+//     net::io_context ioContext;
+//     auto stream = streamBuilder.beginStream(ioContext, target, port);
+//     // Forward the request to the target server
+//     http::write(stream, request);
 
-    // Receive the response from the target server
-    beast::flat_buffer serverBuffer;
-    http::file_body::value_type file;
-    beast::error_code ec;
+//     // Receive the response from the target server
+//     beast::flat_buffer serverBuffer;
+//     http::file_body::value_type file;
+//     beast::error_code ec;
 
-    file.open("tmp", beast::file_mode::write, ec);
-    if (ec) {
-      return ec;
-    }
+//     file.open("tmp", beast::file_mode::write, ec);
+//     if (ec) {
+//       return ec;
+//     }
 
-    http::response<http::file_body> res{std::piecewise_construct,
-                                        std::make_tuple(std::move(file))};
-    http::response_parser<http::file_body> parser{std::move(res)};
+//     http::response<http::file_body> res{std::piecewise_construct,
+//                                         std::make_tuple(std::move(file))};
+//     http::response_parser<http::file_body> parser{std::move(res)};
 
-    parser.body_limit((std::numeric_limits<std::uint64_t>::max)());
-    http::read(stream, serverBuffer, parser);
+//     parser.body_limit((std::numeric_limits<std::uint64_t>::max)());
+//     http::read(stream, serverBuffer, parser);
 
-    // Forward the response to the client
-    auto tresp = parser.release();
-    tresp.body().seek(0, ec);
-    if (ec) {
-      // http::write(clientSocket, tresp, ec);
-      return ec;
-    }
-    http::write(clientSocket, tresp, ec);
-    streamBuilder.endStream(stream, ec);
-    return ec;
-  }
-};
+//     // Forward the response to the client
+//     auto tresp = parser.release();
+//     tresp.body().seek(0, ec);
+//     if (ec) {
+//       // http::write(clientSocket, tresp, ec);
+//       return ec;
+//     }
+//     http::write(clientSocket, tresp, ec);
+//     streamBuilder.endStream(stream, ec);
+//     return ec;
+//   }
+// };
 } // namespace chai
