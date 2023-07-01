@@ -6,6 +6,7 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
 #include <boost/beast/version.hpp>
+
 namespace beast = boost::beast;
 namespace http = beast::http;
 namespace net = boost::asio;
@@ -53,47 +54,23 @@ struct FileBodyReader {
   static auto read(auto &stream, beast::error_code &ec) {
     beast::flat_buffer serverBuffer;
     http::file_body::value_type file;
+    file.open("tmp", beast::file_mode::write, ec);
     http::response<http::file_body> res{std::piecewise_construct,
                                         std::make_tuple(std::move(file))};
-    file.open("tmp", beast::file_mode::write, ec);
+
     if (ec) {
       return res;
     }
+
     http::response_parser<http::file_body> parser{std::move(res)};
     parser.body_limit((std::numeric_limits<std::uint64_t>::max)());
     http::read(stream, serverBuffer, parser);
     // Forward the response to the client
     auto tresp = parser.release();
     tresp.body().seek(0, ec);
-    return res;
+    return tresp;
   }
 };
-// template <typename StreamBuilder>
-// struct FileRequestForwarderImpl : AbstractForwarder {
-//   std::string target;
-//   std::string port;
-//   StreamBuilder streamBuilder;
-//   ~FileRequestForwarderImpl() {}
-//   FileRequestForwarderImpl(const std::string &t, const std::string &p)
-//       : target(t), port(p) {}
-
-//   beast::error_code
-//   operator()(tcp::socket &clientSocket,
-//              http::request<http::dynamic_body> &request) const {
-//     net::io_context ioContext;
-//     auto forwarderStream = streamBuilder.beginStream(ioContext, target,
-//     port);
-
-//     // Forward the request to the target server
-//     http::write(forwarderStream, request);
-//     beast::error_code ec{};
-//     // Receive the response from the target server
-//     auto resp = FileBodyReader::read(forwarderStream, ec);
-//     http::write(clientSocket, resp, ec);
-//     streamBuilder.endStream(forwarderStream, ec);
-//     return ec;
-//   }
-// };
 struct TcpSocketBuilder {
   auto beginStream(net::io_context &ioContext, const std::string &target,
                    const std::string &port) const {
@@ -137,83 +114,4 @@ using SecureGenericForwarder =
     GenericForwarderImpl<SSlStreamBuilder, DynamicBodyReader>;
 using SecureFileRequestForwarder =
     GenericForwarderImpl<SSlStreamBuilder, FileBodyReader>;
-// struct SecureGenericForwarder : AbstractForwarder {
-//   std::string target;
-//   std::string port;
-//   SSlStreamBuilder streamBuilder;
-//   ~SecureGenericForwarder() {}
-//   SecureGenericForwarder(const std::string &t, const std::string &p)
-//       : target(t), port(p) {}
-//   beast::error_code
-//   operator()(tcp::socket &clientSocket,
-//              http::request<http::dynamic_body> &request) const {
-//     net::io_context ioContext;
-//     auto stream = streamBuilder.beginStream(ioContext, target, port);
-//     // Forward the request to the target server
-//     http::write(stream, request);
-
-//     // Receive the response from the target server
-//     beast::flat_buffer serverBuffer;
-//     http::file_body::value_type file;
-//     beast::error_code ec;
-
-//     http::response<http::dynamic_body> res{};
-//     http::read(stream, serverBuffer, res, ec);
-//     if (ec) {
-//       // http::write(clientSocket, tresp, ec);
-//       return ec;
-//     }
-//     http::write(clientSocket, res, ec);
-//     streamBuilder.endStream(stream, ec);
-//     return ec;
-//   }
-// };
-// struct SecureFileRequestForwarder : AbstractForwarder {
-//   std::string target;
-//   std::string port;
-//   SSlStreamBuilder streamBuilder;
-//   ~SecureFileRequestForwarder() {}
-//   SecureFileRequestForwarder(const std::string &t, const std::string &p)
-//       :
-
-//         target(t), port(p) {}
-
-//   beast::error_code
-//   operator()(tcp::socket &clientSocket,
-//              http::request<http::dynamic_body> &request) const {
-
-//     net::io_context ioContext;
-//     auto stream = streamBuilder.beginStream(ioContext, target, port);
-//     // Forward the request to the target server
-//     http::write(stream, request);
-
-//     // Receive the response from the target server
-//     beast::flat_buffer serverBuffer;
-//     http::file_body::value_type file;
-//     beast::error_code ec;
-
-//     file.open("tmp", beast::file_mode::write, ec);
-//     if (ec) {
-//       return ec;
-//     }
-
-//     http::response<http::file_body> res{std::piecewise_construct,
-//                                         std::make_tuple(std::move(file))};
-//     http::response_parser<http::file_body> parser{std::move(res)};
-
-//     parser.body_limit((std::numeric_limits<std::uint64_t>::max)());
-//     http::read(stream, serverBuffer, parser);
-
-//     // Forward the response to the client
-//     auto tresp = parser.release();
-//     tresp.body().seek(0, ec);
-//     if (ec) {
-//       // http::write(clientSocket, tresp, ec);
-//       return ec;
-//     }
-//     http::write(clientSocket, tresp, ec);
-//     streamBuilder.endStream(stream, ec);
-//     return ec;
-//   }
-// };
 } // namespace chai
