@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <utilities.hpp>
 namespace beast = boost::beast;
 namespace http = beast::http;
 namespace net = boost::asio;
@@ -71,8 +72,10 @@ int main(int argc, const char *argv[]) {
       http::file_body::value_type body;
       std::string filetofetch{req.target().substr(1).data(),
                               req.target().length() - 1};
+      auto substrings = split(filetofetch, '/');
+
       filetofetch = std::filesystem::path("/tmp").c_str() + std::string("/") +
-                    filetofetch;
+                    substrings.back();
       body.open(filetofetch.data(), beast::file_mode::scan, ec);
 
       // Handle the case where the file doesn't exist

@@ -66,7 +66,27 @@ struct Router {
                 std::unique_ptr<AbstractForwarder> route) {
     table[path] = std::move(route);
   }
+  AbstractForwarder *wildCardMatch(const std::string &path) const {
+    std::string_view pathview(path);
+    auto wildcarkeys = table | std::views::keys |
+                       std::views::filter([](auto &a) {
+                         return std::string_view(a).ends_with("*");
+                       }) |
+                       std::views::transform([](auto &a) {
+                         return std::string_view(a).substr(0, a.length() - 1);
+                       });
+    auto iter = std::ranges::find_if(
+        wildcarkeys, [&](auto a) { return pathview.starts_with(a); });
+    if (iter != wildcarkeys.end()) {
+      return table.at((*iter).data()).get();
+    }
+    return nullptr;
+  }
   AbstractForwarder *get(const std::string &path) const {
+
+    if (auto matched = wildCardMatch(path); matched != nullptr) {
+      return matched;
+    }
     if (const auto &iter = table.find(path); iter != end(table)) {
       return iter->second.get();
     }

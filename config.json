@@ -20,8 +20,15 @@
     {
         "path": "/redfish/v1/",
         "type": "secure_generic_forwarder",
-        "ip": "rain104bmc.aus.stglabs.ibm.com",
+        "ip": "localhost",
         "port": "https",
+        "default": true
+    },
+    {
+        "path": "/redfish/v1/Systems/system/LogServices/Dump/Entries",
+        "type": "generic_forwarder",
+        "ip": "localhost",
+        "port": "8082",
         "default": true
     },
     {
