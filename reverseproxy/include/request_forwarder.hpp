@@ -36,12 +36,12 @@ static MAKER_FACTORY &forwardMaker() {
   }
   return gmakerFactory;
 }
-struct Router {
+struct RequestForwarder {
   using Map =
       std::unordered_map<std::string, std::unique_ptr<AbstractForwarder>>;
   Map table;
   std::unique_ptr<AbstractForwarder> defaultForwarder;
-  Router(const std::string &config) {
+  RequestForwarder(const std::string &config) {
 
     std::ifstream i(config);
     nlohmann::json routdef;

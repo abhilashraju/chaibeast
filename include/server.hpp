@@ -1,6 +1,5 @@
 #pragma once
 #include "abstractforwarder.hpp"
-#include "router.hpp"
 
 #include <exec/single_thread_context.hpp>
 #include <exec/static_thread_pool.hpp>
@@ -34,7 +33,7 @@ inline auto selectForwarder(auto &router) {
     return std::make_pair(router.get(request.target()), request);
   });
 }
-inline void handleClientRequest(tcp::socket clientSocket, Router &router) {
+inline void handleClientRequest(tcp::socket clientSocket, auto &router) {
   try {
     auto work = handleRead(clientSocket, readHandler) |
                 selectForwarder(router) | processRequest(clientSocket);
@@ -54,13 +53,13 @@ inline auto makeAcceptor(auto &ioContext, auto &endpoint) {
            return acceptor;
          });
 }
-inline auto makeConnectionHandler(tcp::socket clientSock, Router &router) {
+inline auto makeConnectionHandler(tcp::socket clientSock, auto &router) {
   return stdexec::just(std::move(clientSock)) |
          stdexec::then([&router](auto clientSock) {
            handleClientRequest(std::move(clientSock), router);
          });
 }
-inline auto waitForConnection(auto &ioContext, auto &pool, Router &router) {
+inline auto waitForConnection(auto &ioContext, auto &pool, auto &router) {
   return stdexec::then([&](auto acceptor) {
     while (true) {
       tcp::socket clientSocket(ioContext);
@@ -74,11 +73,11 @@ inline auto waitForConnection(auto &ioContext, auto &pool, Router &router) {
     return 0;
   });
 }
-struct Server {
+template <typename Demultiplexer> struct Server {
   std::string port;
-  Router router;
-  Server(const std::string_view &p, const std::string_view config)
-      : port(p.data(), p.length()), router({config.data(), config.length()}) {}
+  Demultiplexer &router;
+  Server(const std::string_view &p, Demultiplexer &dmult)
+      : port(p.data(), p.length()), router(dmult) {}
 
   void start(auto &clientThreadPool) {
     net::io_context ioContext;

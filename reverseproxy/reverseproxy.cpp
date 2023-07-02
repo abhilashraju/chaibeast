@@ -1,6 +1,7 @@
 
 #include "command_line_parser.hpp"
-#include "proxyserver.hpp"
+#include "request_forwarder.hpp"
+#include "server.hpp"
 using namespace chai;
 int main(int argc, const char *argv[]) {
   auto [p, config] = getArgs(parseCommandline(argc, argv), "-p", "-c");
@@ -11,7 +12,11 @@ int main(int argc, const char *argv[]) {
   }
   exec::single_thread_context threadPool;
   // Create the server endpoint
-  Server(p, config.empty() ? "config.json" : config).start(threadPool);
+  if (config.empty()) {
+    config = "config.json";
+  }
+  RequestForwarder router({config.data(), config.length()});
+  Server(p, router).start(threadPool);
 
   return 0;
 }
