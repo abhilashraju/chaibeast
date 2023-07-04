@@ -1,69 +1,14 @@
 #include "command_line_parser.hpp"
-#include <boost/asio.hpp>
-#include <boost/asio/ssl/stream.hpp>
-#include <boost/beast/core.hpp>
-#include <boost/beast/http.hpp>
-#include <boost/beast/ssl.hpp>
-#include <boost/beast/version.hpp>
+#include "ssl_steam_maker.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <utilities.hpp>
 
-namespace beast = boost::beast;
-namespace http = beast::http;
-namespace net = boost::asio;
-namespace ssl = boost::asio::ssl;
-using tcp = net::ip::tcp;
 using namespace chai;
 constexpr const char *trustStorePath = "/etc/ssl/certs/authority";
 constexpr const char *x509Comment = "Generated from OpenBMC service";
-inline void getSslContext(const std::string &sslPemFile,
-                          ssl::context *mSslContext) {
-  mSslContext->set_options(boost::asio::ssl::context::default_workarounds |
-                           boost::asio::ssl::context::no_sslv2 |
-                           boost::asio::ssl::context::no_sslv3 |
-                           boost::asio::ssl::context::single_dh_use |
-                           boost::asio::ssl::context::no_tlsv1 |
-                           boost::asio::ssl::context::no_tlsv1_1);
 
-  // BIG WARNING: This needs to stay disabled, as there will always be
-  // unauthenticated endpoints
-  // mSslContext->set_verify_mode(boost::asio::ssl::verify_peer);
-
-  SSL_CTX_set_options(mSslContext->native_handle(), SSL_OP_NO_RENEGOTIATION);
-
-  std::cout << "Using default TrustStore location: " << trustStorePath;
-  mSslContext->add_verify_path(trustStorePath);
-
-  mSslContext->use_certificate_file(sslPemFile, boost::asio::ssl::context::pem);
-  mSslContext->use_private_key_file(sslPemFile, boost::asio::ssl::context::pem);
-
-  // Set up EC curves to auto (boost asio doesn't have a method for this)
-  // There is a pull request to add this.  Once this is included in an asio
-  // drop, use the right way
-  // http://stackoverflow.com/questions/18929049/boost-asio-with-ecdsa-certificate-issue
-  if (SSL_CTX_set_ecdh_auto(mSslContext->native_handle(), 1) != 1) {
-    std::cout << "Error setting tmp ecdh list\n";
-  }
-
-  // Mozilla intermediate cipher suites v5.7
-  // Sourced from: https://ssl-config.mozilla.org/guidelines/5.7.json
-  const char *mozillaIntermediate = "ECDHE-ECDSA-AES128-GCM-SHA256:"
-                                    "ECDHE-RSA-AES128-GCM-SHA256:"
-                                    "ECDHE-ECDSA-AES256-GCM-SHA384:"
-                                    "ECDHE-RSA-AES256-GCM-SHA384:"
-                                    "ECDHE-ECDSA-CHACHA20-POLY1305:"
-                                    "ECDHE-RSA-CHACHA20-POLY1305:"
-                                    "DHE-RSA-AES128-GCM-SHA256:"
-                                    "DHE-RSA-AES256-GCM-SHA384:"
-                                    "DHE-RSA-CHACHA20-POLY1305";
-
-  if (SSL_CTX_set_cipher_list(mSslContext->native_handle(),
-                              mozillaIntermediate) != 1) {
-    std::cout << "Error setting cipher list\n";
-  }
-}
 int main(int argc, const char *argv[]) {
   // Create a server endpoint
   auto [port] = getArgs(parseCommandline(argc, argv), "-p");
@@ -73,9 +18,10 @@ int main(int argc, const char *argv[]) {
     return 0;
   }
   net::io_context ioc;
-  ssl::context sslContext(boost::asio::ssl::context::tls_server);
-
-  getSslContext("/etc/ssl/certs/https/server.pem", &sslContext);
+  ssl::context sslContext(getSslServerContext(
+      "/Users/abhilashraju/work/cpp/chai/certs/server-certificate.pem",
+      "/Users/abhilashraju/work/cpp/chai/certs/server-private-key.pem",
+      trustStorePath));
 
   tcp::acceptor acceptor(ioc, tcp::endpoint(tcp::v4(), atoi(port.data())));
   acceptor.listen();

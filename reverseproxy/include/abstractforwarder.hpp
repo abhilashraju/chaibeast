@@ -1,21 +1,9 @@
 #pragma once
-#include <boost/asio.hpp>
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/ssl/stream.hpp>
-#include <boost/beast/core.hpp>
-#include <boost/beast/http.hpp>
-#include <boost/beast/ssl.hpp>
-#include <boost/beast/version.hpp>
-
-namespace beast = boost::beast;
-namespace http = beast::http;
-namespace net = boost::asio;
-using tcp = boost::asio::ip::tcp;
+#include "common_defs.hpp"
 namespace chai {
 struct AbstractForwarder {
-  virtual beast::error_code
-  operator()(tcp::socket &clientSocket,
-             http::request<http::dynamic_body> &request) const = 0;
+  virtual ChaiResponse
+  operator()(http::request<http::dynamic_body> &request) const = 0;
   virtual ~AbstractForwarder(){};
 };
 
@@ -27,9 +15,7 @@ struct GenericForwarderImpl : AbstractForwarder {
   ~GenericForwarderImpl() {}
   GenericForwarderImpl(const std::string &t, const std::string &p)
       : target(t), port(p) {}
-  beast::error_code
-  operator()(tcp::socket &clientSocket,
-             http::request<http::dynamic_body> &request) const {
+  ChaiResponse operator()(http::request<http::dynamic_body> &request) const {
     net::io_context ioContext;
     auto forwarderStream = streamBuilder.beginStream(ioContext, target, port);
     // Forward the request to the target server
@@ -37,9 +23,11 @@ struct GenericForwarderImpl : AbstractForwarder {
     beast::error_code ec{};
     auto res = BodyReader::read(forwarderStream, ec);
     // Receive the response from the target server
-    http::write(clientSocket, res, ec);
+    if (ec) {
+      throw std::runtime_error("Error response from end point");
+    }
     streamBuilder.endStream(forwarderStream, ec);
-    return ec;
+    return res;
   }
 };
 struct DynamicBodyReader {
@@ -106,12 +94,16 @@ struct SSlStreamBuilder {
     stream.shutdown(ec);
   }
 };
+
 using GenericForwarder =
     GenericForwarderImpl<TcpSocketBuilder, DynamicBodyReader>;
+
 using FileRequestForwarder =
     GenericForwarderImpl<TcpSocketBuilder, FileBodyReader>;
+
 using SecureGenericForwarder =
     GenericForwarderImpl<SSlStreamBuilder, DynamicBodyReader>;
+
 using SecureFileRequestForwarder =
     GenericForwarderImpl<SSlStreamBuilder, FileBodyReader>;
 } // namespace chai

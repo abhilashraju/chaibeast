@@ -16,7 +16,12 @@ int main(int argc, const char *argv[]) {
     config = "config.json";
   }
   RequestForwarder router({config.data(), config.length()});
-  Server(p, router).start(threadPool);
+  // SocketStreamMaker streamMaker;
+  SSlServer(p, router,
+            "/Users/abhilashraju/work/cpp/chai/certs/server-certificate.pem",
+            "/Users/abhilashraju/work/cpp/chai/certs/server-private-key.pem",
+            "/etc/ssl/certs/authority")
+      .start(threadPool);
 
   return 0;
 }
