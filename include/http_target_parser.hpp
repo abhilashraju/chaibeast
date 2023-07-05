@@ -1,5 +1,6 @@
 #pragma once
 #include "regex_range.hpp"
+#include "utilities.hpp"
 #include <numeric>
 #include <string>
 #include <vector>
@@ -29,21 +30,21 @@ struct http_function {
 std::string to_string(std::string_view vw) {
   return std::string(vw.data(), vw.length());
 }
-inline std::vector<std::string> split(std::string_view sv, char delim) {
-  std::vector<std::string> res;
-  return std::accumulate(begin(sv), end(sv), res, [&](auto &sofar, auto c) {
-    if (sofar.size() == 0) {
-      sofar.emplace_back(std::string() + c);
-      return sofar;
-    }
-    if (c == delim) {
-      sofar.emplace_back();
-      return sofar;
-    }
-    sofar.back() += c;
-    return sofar;
-  });
-}
+// inline std::vector<std::string> split(std::string_view sv, char delim) {
+//   std::vector<std::string> res;
+//   return std::accumulate(begin(sv), end(sv), res, [&](auto &sofar, auto c) {
+//     if (sofar.size() == 0) {
+//       sofar.emplace_back(std::string() + c);
+//       return sofar;
+//     }
+//     if (c == delim) {
+//       sofar.emplace_back();
+//       return sofar;
+//     }
+//     sofar.back() += c;
+//     return sofar;
+//   });
+// }
 inline http_function parse_function(std::string_view target) {
   auto index = target.find_last_of("/");
   if (index != std::string::npos) {

@@ -1,6 +1,6 @@
 #pragma once
-#include "abstractforwarder.hpp"
 #include "chai_concepts.hpp"
+#include "common_defs.hpp"
 #include "handle_error.hpp"
 #include "ssl_steam_maker.hpp"
 
@@ -19,7 +19,7 @@ struct SocketStreamMaker {
       beast::flat_buffer buffer;
       http::request<http::dynamic_body> request;
       http::read(stream, buffer, request);
-      return request;
+      return ChaiRequest{std::move(request)};
     }
     void close(beast::error_code &ec) { stream.close(); }
   };
@@ -37,7 +37,7 @@ struct SslStreamMaker {
       beast::flat_buffer buffer;
       http::request<http::dynamic_body> request;
       http::read(stream, buffer, request);
-      return request;
+      return ChaiRequest{std::move(request)};
     }
     void close(beast::error_code &ec) {
       stream.shutdown(ec);
@@ -71,7 +71,8 @@ inline auto processRequest() {
 struct processError {
   ChaiResponse operator()(auto &e) const {
     std::cout << "Internal Server Error \n" << e.what() << "\n";
-    http::response<http::string_body> resp;
+    http::response<http::string_body> resp{http::status::internal_server_error,
+                                           11};
     resp.body() = std::string("Internal Server error ") + e.what();
     return resp;
   }
@@ -87,7 +88,7 @@ inline auto sendResponse(auto &clientSocket) {
 }
 inline auto selectForwarder(auto &router) {
   return stdexec::then([&router](auto request) {
-    return std::make_pair(router.get(request.target()), request);
+    return std::make_pair(router.get(target(request)), std::move(request));
   });
 }
 inline void handleClientRequest(auto clientSocket, auto &router) {

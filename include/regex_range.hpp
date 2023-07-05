@@ -1,4 +1,5 @@
 #pragma once
+#include <numeric>
 #include <regex>
 namespace chai {
 template <typename Range> struct regex_range {

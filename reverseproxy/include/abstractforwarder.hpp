@@ -2,8 +2,7 @@
 #include "common_defs.hpp"
 namespace chai {
 struct AbstractForwarder {
-  virtual ChaiResponse
-  operator()(http::request<http::dynamic_body> &request) const = 0;
+  virtual ChaiResponse operator()(ChaiRequest &request) const = 0;
   virtual ~AbstractForwarder(){};
 };
 
@@ -15,11 +14,17 @@ struct GenericForwarderImpl : AbstractForwarder {
   ~GenericForwarderImpl() {}
   GenericForwarderImpl(const std::string &t, const std::string &p)
       : target(t), port(p) {}
-  ChaiResponse operator()(http::request<http::dynamic_body> &request) const {
+  ChaiResponse operator()(ChaiRequest &requestVar) const {
+
     net::io_context ioContext;
     auto forwarderStream = streamBuilder.beginStream(ioContext, target, port);
-    // Forward the request to the target server
-    http::write(forwarderStream, request);
+    std::visit(
+        [&](auto &&req) {
+          // Forward the request to the target server
+          http::write(forwarderStream, req);
+        },
+        requestVar);
+
     beast::error_code ec{};
     auto res = BodyReader::read(forwarderStream, ec);
     // Receive the response from the target server

@@ -8,7 +8,7 @@ inline auto stringSplitter(char c) {
            return std::string(sub.begin(), sub.end());
          });
 }
-inline auto split(const std::string &input, char c) {
+inline auto split(const std::string_view &input, char c) {
   auto vw = input | stringSplitter(c);
   return std::vector(vw.begin(), vw.end());
 }

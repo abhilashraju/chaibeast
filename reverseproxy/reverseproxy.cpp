@@ -16,6 +16,7 @@ int main(int argc, const char *argv[]) {
     config = "config.json";
   }
   RequestForwarder router({config.data(), config.length()});
+  "/etc/ssl/certs/https/server.pem";
   // SocketStreamMaker streamMaker;
   SSlServer(p, router,
             "/Users/abhilashraju/work/cpp/chai/certs/server-certificate.pem",

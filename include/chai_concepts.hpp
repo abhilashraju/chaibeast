@@ -1,4 +1,5 @@
 #pragma once
+#include "common_defs.hpp"
 #include <concepts>
 namespace chai {
 template <typename Handler, typename Type>
