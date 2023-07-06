@@ -81,12 +81,19 @@ struct HttpRouter {
   HANDLER_MAP delete_handlers;
 };
 
-struct HttpServer {
+struct HttpsServer {
   HttpRouter router_;
   SSlServer<HttpRouter> server;
-  HttpServer(std::string_view port, const char *serverCert,
-             const char *serverPkey, const char *trustStore)
+  HttpsServer(std::string_view port, const char *serverCert,
+              const char *serverPkey, const char *trustStore)
       : server(port, router_, serverCert, serverPkey, trustStore) {}
+  HttpRouter &router() { return router_; }
+  void start(auto &pool) { server.start(pool); }
+};
+struct HttpServer {
+  HttpRouter router_;
+  TCPServer<HttpRouter> server;
+  HttpServer(std::string_view port) : server(port, router_) {}
   HttpRouter &router() { return router_; }
   void start(auto &pool) { server.start(pool); }
 };

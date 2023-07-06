@@ -1,10 +1,11 @@
 #include "command_line_parser.hpp"
 #include "http_server.hpp"
+#include <chrono>
+#include <exec/static_thread_pool.hpp>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <utilities.hpp>
-
 using namespace chai;
 constexpr const char *trustStorePath = "/etc/ssl/certs/authority";
 constexpr const char *x509Comment = "Generated from OpenBMC service";
@@ -17,8 +18,8 @@ int main(int argc, const char *argv[]) {
     std::cout << "eg: fileserver -p port\n";
     return 0;
   }
-  exec::single_thread_context threadPool;
-  HttpServer server(
+  exec::static_thread_pool threadPool;
+  HttpsServer server(
       port, "/Users/abhilashraju/work/cpp/chai/certs/server-certificate.pem",
       "/Users/abhilashraju/work/cpp/chai/certs/server-private-key.pem",
       "/etc/ssl/certs/authority");
@@ -35,8 +36,12 @@ int main(int argc, const char *argv[]) {
   };
   server.router().add_get_handler(
       "/hello", plain_text_handler([](auto &req, auto &httpfunc) {
-        std::cout << "reached hello handler";
         return "<B>Hello World</B>";
+      }));
+  server.router().add_get_handler(
+      "/infinite", plain_text_handler([](auto &req, auto &httpfunc) {
+        std::this_thread::sleep_for(std::chrono::seconds(100));
+        return "<B>infinite</B>";
       }));
   server.start(threadPool);
   return 0;

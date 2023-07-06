@@ -11,7 +11,7 @@
 #include <iostream>
 
 namespace chai {
-struct SocketStreamMaker {
+struct TCPStreamMaker {
 
   struct SocketStreamReader {
     tcp::socket stream;
@@ -28,6 +28,25 @@ struct SocketStreamMaker {
     tcp::socket clientSocket(ioContext);
     acceptor.accept(clientSocket);
     return SocketStreamReader{std::move(clientSocket)};
+  }
+  void acceptAsyncConnection(net::io_context &ioContext,
+                             tcp::acceptor &acceptor, auto work) {
+
+    auto do_accept = [&ioContext, &work, this,
+                      &acceptor](net::yield_context yield) {
+      while (true) {
+        tcp::socket stream(ioContext);
+
+        acceptor.async_accept(stream, yield);
+
+        auto do_work = [&work, stream = std::move(stream)](
+                           net::yield_context yield) mutable {
+          work(SocketStreamReader{std::move(stream)});
+        };
+        spawn(ioContext, std::move(do_work));
+      }
+    };
+    spawn(ioContext, do_accept);
   }
 };
 struct SslStreamMaker {
@@ -56,6 +75,29 @@ struct SslStreamMaker {
     clientSocket.handshake(ssl::stream_base::server);
     return SSlStreamReader{std::move(clientSocket)};
   }
+  void acceptAsyncConnection(net::io_context &ioContext,
+                             tcp::acceptor &acceptor, auto work) {
+
+    auto do_accept = [&ioContext, &work, this,
+                      &acceptor](net::yield_context yield) {
+      while (true) {
+        ssl::stream<tcp::socket> stream(ioContext, sslContext);
+
+        acceptor.async_accept(stream.next_layer(), yield);
+        auto do_handshake = [&ioContext, &work, stream = std::move(stream)](
+                                net::yield_context yield) mutable {
+          stream.async_handshake(ssl::stream_base::server, yield);
+          auto do_work = [&work, stream = std::move(stream)](
+                             net::yield_context yield) mutable {
+            work(SSlStreamReader{std::move(stream)});
+          };
+          spawn(ioContext, std::move(do_work));
+        };
+        spawn(ioContext, do_handshake);
+      }
+    };
+    spawn(ioContext, do_accept);
+  }
 };
 
 template <typename Stream> inline auto handleRead(Stream &sock) {
@@ -70,7 +112,6 @@ inline auto processRequest() {
 }
 struct processError {
   ChaiResponse operator()(auto &e) const {
-    std::cout << "Internal Server Error \n" << e.what() << "\n";
     http::response<http::string_body> resp{http::status::internal_server_error,
                                            11};
     resp.body() = std::string("Internal Server error ") + e.what();
@@ -135,6 +176,27 @@ inline auto waitForConnection(auto &ioContext, auto &pool, auto &router,
     return 0;
   });
 }
+inline auto waitForAsyncConnection(auto &ioContext, auto &pool, auto &router,
+                                   auto &streamMaker) {
+  return stdexec::then([&](auto acceptor) {
+    try {
+
+      auto asyncWork = [&](auto stream) {
+        auto work = makeConnectionHandler(std::move(stream), router);
+        auto snd = stdexec::on(pool.get_scheduler(), std::move(work));
+        stdexec::start_detached(std::move(snd));
+      };
+      streamMaker.acceptAsyncConnection(ioContext, acceptor,
+                                        std::move(asyncWork));
+
+    } catch (const std::exception &e) {
+      std::cout << e.what() << '\n';
+    }
+    ioContext.run();
+
+    return 0;
+  });
+}
 template <typename Demultiplexer, typename StreamMaker> struct Server {
   std::string port;
   Demultiplexer &router;
@@ -160,5 +222,12 @@ struct SSlServer : Server<Demultiplexer, SslStreamMaker> {
             const char *privKey,
             const char *certstore = "/etc/ssl/certs/authority")
       : Base(p, router, SslStreamMaker(cert, privKey, certstore)) {}
+};
+
+template <typename Demultiplexer>
+struct TCPServer : Server<Demultiplexer, TCPStreamMaker> {
+  using Base = Server<Demultiplexer, TCPStreamMaker>;
+  TCPServer(std::string_view p, Demultiplexer &router)
+      : Base(p, router, TCPStreamMaker()) {}
 };
 } // namespace chai
