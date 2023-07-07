@@ -7,8 +7,10 @@ project(
     'warning_level=3',
     'cpp_std=c++20',
   ])
+
+CHAI_ARGS=['-DSSL_ON']
 openssl_dep = dependency('openssl', version: '>=1.1.1')
 boost_dep = dependency('boost')
 subdir('reverseproxy')
-subdir('fileserver')
+#subdir('fileserver')
 subdir('dump_server')

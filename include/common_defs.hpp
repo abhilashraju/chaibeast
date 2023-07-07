@@ -1,10 +1,12 @@
 #pragma once
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
-#include <boost/asio/ssl/stream.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#ifdef SSL_ON
+#include <boost/asio/ssl/stream.hpp>
 #include <boost/beast/ssl.hpp>
+#endif
 #include <boost/beast/version.hpp>
 namespace chai
 {
@@ -27,16 +29,38 @@ using DynamicbodyRequest = http::request<http::dynamic_body>;
 using VariantRequest =
     std::variant<FilebodyRequest, StringbodyRequest, DynamicbodyRequest>;
 
-inline auto target(VariantRequest& reqVariant)
+inline auto target(const VariantRequest& reqVariant)
 {
     return std::visit([](auto&& req) { return req.target(); }, reqVariant);
 }
-inline http::verb method(VariantRequest& reqVariant)
+inline http::verb method(const VariantRequest& reqVariant)
 {
     return std::visit([](auto&& req) { return req.method(); }, reqVariant);
 }
-inline auto version(VariantRequest& reqVariant)
+inline auto version(const VariantRequest& reqVariant)
 {
     return std::visit([](auto&& req) { return req.version(); }, reqVariant);
 }
+template <typename ReqTye>
+struct BodyHandlerImpl
+{
+    auto operator()(auto func) const
+    {
+        return [func = std::move(func)](
+                   auto& req, auto& httpfunc) -> chai::VariantResponse {
+            return std::visit(
+                [&](auto&& r) {
+                using T = std::decay_t<decltype(r)>;
+                if constexpr (std::is_same_v<ReqTye, T>)
+                {
+                    return func(r, httpfunc);
+                }
+                throw std::runtime_error("Requested Type miss match");
+                return chai::VariantResponse{};
+                },
+                req);
+        };
+    }
+};
+using DynamicBodyHandler = BodyHandlerImpl<DynamicbodyRequest>;
 } // namespace chai

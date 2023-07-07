@@ -1,4 +1,5 @@
 #include "command_line_parser.hpp"
+#include "dump_uploader.hpp"
 #include "http_server.hpp"
 
 #include <exec/static_thread_pool.hpp>
@@ -7,10 +8,12 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 using namespace chai;
 constexpr const char* trustStorePath = "/etc/ssl/certs/authority";
 constexpr const char* x509Comment = "Generated from OpenBMC service";
+using namespace redfish;
 
 int main(int argc, const char* argv[])
 {
@@ -27,9 +30,10 @@ int main(int argc, const char* argv[])
         port, "/Users/abhilashraju/work/cpp/chai/certs/server-certificate.pem",
         "/Users/abhilashraju/work/cpp/chai/certs/server-private-key.pem",
         "/etc/ssl/certs/authority");
+    // HttpServer server(port);
 
     auto plain_text_handler = [](auto func) {
-        return [func = std::move(func)](auto& req, auto& httpfunc) {
+        return [func = std::move(func)](const auto& req, const auto& httpfunc) {
             http::response<http::string_body> resp{http::status::ok,
                                                    version(req)};
             resp.set(http::field::content_type, "text/plain");
@@ -39,6 +43,7 @@ int main(int argc, const char* argv[])
             return resp;
         };
     };
+
     server.router().add_get_handler(
         "/hello", plain_text_handler([](auto& req, auto& httpfunc) {
             return "<B>Hello World</B>";
@@ -48,11 +53,9 @@ int main(int argc, const char* argv[])
             std::this_thread::sleep_for(std::chrono::seconds(100));
             return "<B>infinite</B>";
         }));
-    // server.router().add_get_handler(
-    //     "/redfish/v1/Systems/system/LogServices/Dump/Entries",
-    //     plain_text_handler([](auto &req, auto &httpfunc) {
-
-    //     }));
+    server.router().add_get_handler(
+        "/redfish/v1/Systems/system/LogServices/Dump/{filename}/Entries",
+        DynamicBodyHandler()(processUpload));
     server.start(threadPool);
     return 0;
 }

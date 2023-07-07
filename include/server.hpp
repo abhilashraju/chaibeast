@@ -20,7 +20,7 @@ struct TCPStreamMaker
         auto read()
         {
             beast::flat_buffer buffer;
-            http::request<http::dynamic_body> request;
+            DynamicbodyRequest request;
             http::read(stream, buffer, request);
             return VariantRequest{std::move(request)};
         }
@@ -57,6 +57,7 @@ struct TCPStreamMaker
         spawn(ioContext, do_accept);
     }
 };
+#ifdef SSL_ON
 struct SslStreamMaker
 {
     struct SSlStreamReader
@@ -114,7 +115,7 @@ struct SslStreamMaker
         spawn(ioContext, do_accept);
     }
 };
-
+#endif
 template <typename Stream>
 inline auto handleRead(Stream& sock)
 {
@@ -249,6 +250,7 @@ struct Server
         std::cout << std::get<0>(stdexec::sync_wait(server).value());
     }
 };
+#ifdef SSL_ON
 template <typename Demultiplexer>
 struct SSlServer : Server<Demultiplexer, SslStreamMaker>
 {
@@ -259,7 +261,7 @@ struct SSlServer : Server<Demultiplexer, SslStreamMaker>
         Base(p, router, SslStreamMaker(cert, privKey, certstore))
     {}
 };
-
+#endif
 template <typename Demultiplexer>
 struct TCPServer : Server<Demultiplexer, TCPStreamMaker>
 {

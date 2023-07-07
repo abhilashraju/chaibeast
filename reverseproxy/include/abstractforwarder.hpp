@@ -89,7 +89,7 @@ struct TcpSocketBuilder
     auto endStream(auto& forwardingSocket, beast::error_code& ec) const {}
 };
 namespace ssl = boost::asio::ssl;
-
+#ifdef SSL_ON
 struct SSlStreamBuilder
 {
     auto beginStream(net::io_context& ioContext, const std::string& target,
@@ -113,16 +113,16 @@ struct SSlStreamBuilder
         stream.shutdown(ec);
     }
 };
+using SecureGenericForwarder =
+    GenericForwarderImpl<SSlStreamBuilder, DynamicBodyReader>;
 
+using SecureFileRequestForwarder =
+    GenericForwarderImpl<SSlStreamBuilder, FileBodyReader>;
+#endif
 using GenericForwarder =
     GenericForwarderImpl<TcpSocketBuilder, DynamicBodyReader>;
 
 using FileRequestForwarder =
     GenericForwarderImpl<TcpSocketBuilder, FileBodyReader>;
 
-using SecureGenericForwarder =
-    GenericForwarderImpl<SSlStreamBuilder, DynamicBodyReader>;
-
-using SecureFileRequestForwarder =
-    GenericForwarderImpl<SSlStreamBuilder, FileBodyReader>;
 } // namespace chai

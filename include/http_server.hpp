@@ -1,10 +1,9 @@
 #pragma once
+#include "flat_map.hpp"
 #include "http_errors.hpp"
 #include "http_target_parser.hpp"
 #include "request_mapper.hpp"
 #include "server.hpp"
-
-#include <boost/container/flat_map.hpp>
 namespace chai
 {
 
@@ -16,9 +15,7 @@ struct HttpRouter
                                        const http_function& vw) = 0;
         virtual ~handler_base() {}
     };
-    using HANDLER_MAP =
-        boost::container::flat_map<request_mapper,
-                                   std::unique_ptr<handler_base>>;
+    using HANDLER_MAP = flat_map<request_mapper, std::unique_ptr<handler_base>>;
     template <typename HandlerFunc>
     struct handler : handler_base
     {
@@ -104,7 +101,7 @@ struct HttpRouter
     HANDLER_MAP post_handlers;
     HANDLER_MAP delete_handlers;
 };
-
+#ifdef SSL_ON
 struct HttpsServer
 {
     HttpRouter router_;
@@ -122,6 +119,7 @@ struct HttpsServer
         server.start(pool);
     }
 };
+#endif
 struct HttpServer
 {
     HttpRouter router_;
