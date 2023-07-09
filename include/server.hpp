@@ -17,12 +17,22 @@ struct TCPStreamMaker
     struct SocketStreamReader
     {
         tcp::socket stream;
-        auto read()
+        auto read(beast::error_code& ec)
         {
             beast::flat_buffer buffer;
             DynamicbodyRequest request;
-            http::read(stream, buffer, request);
+            http::read(stream, buffer, request, ec);
             return VariantRequest{std::move(request)};
+        }
+        auto read()
+        {
+            beast::error_code ec{};
+            auto ret = read(ec);
+            if (ec)
+            {
+                throw std::runtime_error(ec.message());
+            }
+            return ret;
         }
         void close(beast::error_code& ec)
         {
@@ -63,12 +73,22 @@ struct SslStreamMaker
     struct SSlStreamReader
     {
         ssl::stream<tcp::socket> stream;
-        auto read()
+        auto read(beast::error_code& ec)
         {
             beast::flat_buffer buffer;
             http::request<http::dynamic_body> request;
-            http::read(stream, buffer, request);
+            http::read(stream, buffer, request, ec);
             return VariantRequest{std::move(request)};
+        }
+        auto read()
+        {
+            beast::error_code ec{};
+            auto ret = read(ec);
+            if (ec)
+            {
+                throw std::runtime_error(ec.message());
+            }
+            return ret;
         }
         void close(beast::error_code& ec)
         {
@@ -100,12 +120,14 @@ struct SslStreamMaker
 
                 acceptor.async_accept(stream.next_layer(), yield);
                 auto do_handshake =
-                    [&ioContext, &work, stream = std::move(stream)](
+                    [&ioContext, &work,
+                     stream = CopyableMoveWrapper(std::move(stream))](
                         net::yield_context yield) mutable {
-                    stream.async_handshake(ssl::stream_base::server, yield);
-                    auto do_work = [&work, stream = std::move(stream)](
-                                       net::yield_context yield) mutable {
-                        work(SSlStreamReader{std::move(stream)});
+                    stream.get().async_handshake(ssl::stream_base::server,
+                                                 yield);
+                    auto do_work =
+                        [&work, stream](net::yield_context yield) mutable {
+                        work(SSlStreamReader{std::move(stream.release())});
                     };
                     spawn(ioContext, std::move(do_work));
                 };
@@ -121,22 +143,49 @@ inline auto handleRead(Stream& sock)
 {
     return stdexec::just() | stdexec::then([&]() { return sock.read(); });
 }
+template <typename Stream>
+inline auto handleFinish(Stream& sock)
+{
+    return stdexec::then([&]() {
+        // beast::error_code ec{};
+        // do
+        // {
+        //     sock.read(ec);
+        // } while (!ec);
+        beast::error_code ec{};
+        sock.close(ec);
+    });
+}
 
 inline auto processRequest()
 {
     return stdexec::then([&](auto handlerRequestPair) {
         auto& [handler, request] = handlerRequestPair;
+        if (!handler)
+        {
+            throw std::runtime_error("Suggested forwarder type is null");
+        }
         return (*handler)(request);
     });
 }
-struct processError
+struct ProcessApplicationError
 {
     VariantResponse operator()(auto& e) const
     {
         http::response<http::string_body> resp{
-            http::status::internal_server_error, 11};
+            http::status::internal_server_error, 10};
         resp.body() = std::string("Internal Server error ") + e.what();
+        resp.set(http::field::content_length,
+                 std::to_string(resp.body().length()));
         return resp;
+    }
+};
+
+struct ProcessSystemError
+{
+    auto operator()(auto& e) const
+    {
+        std::cout << e.what() << "\n";
     }
 };
 inline auto sendResponse(auto& clientSocket)
@@ -158,12 +207,11 @@ inline auto selectForwarder(auto& router)
 inline void handleClientRequest(auto clientSocket, auto& router)
 {
     auto work = handleRead(clientSocket) | selectForwarder(router) |
-                processRequest() | handle_error(processError{}) |
-                sendResponse(clientSocket.stream);
+                processRequest() | handle_error(ProcessApplicationError{}) |
+                sendResponse(clientSocket.stream) | handleFinish(clientSocket) |
+                handle_error(ProcessSystemError{});
 
     stdexec::sync_wait(work);
-    beast::error_code ec{};
-    clientSocket.close(ec);
 }
 
 inline auto makeAcceptor(auto& ioContext, auto& endpoint)

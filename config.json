@@ -1,38 +1,32 @@
 [
     {
         "path": "/hello",
-        "type": "secure_generic_forwarder",
         "ip": "localhost",
         "port": "8082"
     },
     {
         "path": "/file/*",
-        "type": "secure_file_forwarder",
         "ip": "localhost",
         "port": "8082"
     },
     {
         "path": "/bmcweb",
-        "type": "file_forwarder",
         "ip": "localhost",
         "port": "8082"
     },
     {
         "path": "/redfish/v1/",
-        "type": "secure_generic_forwarder",
         "ip": "localhost",
         "port": "https",
         "default": true
     },
     {
         "path": "/redfish/v1/Systems/system/LogServices/Dump/*",
-        "type": "secure_file_forwarder",
         "ip": "localhost",
         "port": "8082"
     },
     {
         "path": "/",
-        "type": "secure_generic_forwarder",
         "ip": "www.google.com",
         "port": "https"
     }

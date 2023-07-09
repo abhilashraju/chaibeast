@@ -3,6 +3,8 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+
+#include <iostream>
 #ifdef SSL_ON
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/beast/ssl.hpp>
@@ -20,9 +22,10 @@ using tcp = net::ip::tcp;
 using FilebodyResponse = http::response<http::file_body>;
 using StringbodyResponse = http::response<http::string_body>;
 using DynamicbodyResponse = http::response<http::dynamic_body>;
+using EmptybodyResponse = http::response<http::empty_body>;
 
-using VariantResponse =
-    std::variant<FilebodyResponse, StringbodyResponse, DynamicbodyResponse>;
+using VariantResponse = std::variant<EmptybodyResponse, FilebodyResponse,
+                                     StringbodyResponse, DynamicbodyResponse>;
 using FilebodyRequest = http::request<http::file_body>;
 using StringbodyRequest = http::request<http::string_body>;
 using DynamicbodyRequest = http::request<http::dynamic_body>;
@@ -47,7 +50,8 @@ struct BodyHandlerImpl
     auto operator()(auto func) const
     {
         return [func = std::move(func)](
-                   auto& req, auto& httpfunc) -> chai::VariantResponse {
+                   const auto& req,
+                   const auto& httpfunc) -> chai::VariantResponse {
             return std::visit(
                 [&](auto&& r) {
                 using T = std::decay_t<decltype(r)>;
@@ -63,4 +67,21 @@ struct BodyHandlerImpl
     }
 };
 using DynamicBodyHandler = BodyHandlerImpl<DynamicbodyRequest>;
+
+template <typename Moveonly>
+struct CopyableMoveWrapper
+{
+    std::shared_ptr<Moveonly> moveOnly;
+    CopyableMoveWrapper(Moveonly mv) : moveOnly(new Moveonly(std::move(mv))) {}
+    Moveonly& get()
+    {
+        return *moveOnly;
+    };
+    Moveonly release()
+    {
+        Moveonly mv = std::move(*moveOnly.get());
+        moveOnly.reset();
+        return mv;
+    }
+};
 } // namespace chai

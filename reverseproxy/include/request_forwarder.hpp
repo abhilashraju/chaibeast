@@ -21,6 +21,11 @@ inline std::unique_ptr<AbstractForwarder>
 {
     return std::make_unique<GenericForwarder>(ip, port);
 }
+inline std::unique_ptr<AbstractForwarder>
+    flexible_forwarder(const std::string& ip, const std::string& port)
+{
+    return std::make_unique<FlexibleForwarder>(ip, port);
+}
 #ifdef SSL_ON
 inline std::unique_ptr<AbstractForwarder>
     secure_file_forwarder(const std::string& ip, const std::string& port)
@@ -32,6 +37,12 @@ inline std::unique_ptr<AbstractForwarder>
 {
     return std::make_unique<SecureGenericForwarder>(ip, port);
 }
+inline std::unique_ptr<AbstractForwarder>
+    secure_flexible_forwarder(const std::string& ip, const std::string& port)
+{
+    return std::make_unique<SecureFlexibleForwarder>(ip, port);
+}
+
 #endif
 static MAKER_FACTORY& forwardMaker()
 {
@@ -40,10 +51,13 @@ static MAKER_FACTORY& forwardMaker()
     {
         gmakerFactory["file_forwarder"] = file_forwarder;
         gmakerFactory["generic_forwarder"] = generic_forwarder;
+        gmakerFactory["flexible_forwarder"] = flexible_forwarder;
 #ifdef SSL_ON
         gmakerFactory["secure_file_forwarder"] = secure_file_forwarder;
 
         gmakerFactory["secure_generic_forwarder"] = secure_generic_forwarder;
+        gmakerFactory["secure_flexible_forwarder"] = secure_flexible_forwarder;
+
 #endif
     }
     return gmakerFactory;
@@ -61,7 +75,16 @@ struct RequestForwarder
         i >> routdef;
         for (auto& r : routdef)
         {
-            auto makeForwader = forwardMaker()[r["type"].get<std::string>()];
+#ifdef SSL_ON
+            auto forwarderType = r["type"].is_null()
+                                     ? std::string("secure_flexible_forwarder")
+                                     : r["type"].get<std::string>();
+#else
+            auto forwarderType = r["type"].is_null()
+                                     ? std::string("flexible_forwarder")
+                                     : r["type"].get<std::string>();
+#endif
+            auto makeForwader = forwardMaker()[forwarderType];
             if (makeForwader)
             {
                 std::cout << r["path"].get<std::string>();

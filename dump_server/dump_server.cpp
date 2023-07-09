@@ -26,11 +26,14 @@ int main(int argc, const char* argv[])
         return 0;
     }
     exec::static_thread_pool threadPool;
+#ifdef SSL_ON
     HttpsServer server(
         port, "/Users/abhilashraju/work/cpp/chai/certs/server-certificate.pem",
         "/Users/abhilashraju/work/cpp/chai/certs/server-private-key.pem",
         "/etc/ssl/certs/authority");
-    // HttpServer server(port);
+#else
+    HttpServer server(port);
+#endif
 
     auto plain_text_handler = [](auto func) {
         return [func = std::move(func)](const auto& req, const auto& httpfunc) {
@@ -53,9 +56,7 @@ int main(int argc, const char* argv[])
             std::this_thread::sleep_for(std::chrono::seconds(100));
             return "<B>infinite</B>";
         }));
-    server.router().add_get_handler(
-        "/redfish/v1/Systems/system/LogServices/Dump/{filename}/Entries",
-        DynamicBodyHandler()(processUpload));
+    DumpUploader uploader(server.router());
     server.start(threadPool);
     return 0;
 }
