@@ -7,4 +7,4 @@ executable(
   include_directories: proxy_includes,
   dependencies:[openssl_dep,boost_dep,jsondep],
   install: true,
-  install_dir: get_option('bindir'),cpp_args : CHAI_ARGS)
+  install_dir: get_option('bindir'),cpp_args : CHAI_ARGS,link_args: ['-L' + boost_lib_path, '-lboost_coroutine'])

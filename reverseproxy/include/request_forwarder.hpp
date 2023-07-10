@@ -101,6 +101,8 @@ struct RequestForwarder
             }
         }
     }
+    RequestForwarder(const RequestForwarder&) = delete;
+    RequestForwarder(RequestForwarder&&) = delete;
     void addRoute(const std::string& path,
                   std::unique_ptr<AbstractForwarder> route)
     {
