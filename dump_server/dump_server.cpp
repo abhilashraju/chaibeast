@@ -18,7 +18,7 @@ using namespace redfish;
 int main(int argc, const char* argv[])
 {
     // Create a server endpoint
-    auto [port] = getArgs(parseCommandline(argc, argv), "-p");
+    auto [port,root] = getArgs(parseCommandline(argc, argv), "-p","-r");
     if (port.empty())
     {
         std::cout << "Invalid arguments\n";
@@ -56,7 +56,7 @@ int main(int argc, const char* argv[])
             std::this_thread::sleep_for(std::chrono::seconds(100));
             return "<B>infinite</B>";
         }));
-    DumpUploader uploader(server.router());
+    DumpUploader uploader(server.router(),root);
     server.start(threadPool);
     return 0;
 }

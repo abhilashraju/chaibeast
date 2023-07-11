@@ -11,8 +11,9 @@ namespace redfish
 {
 class DumpUploader
 {
+    std::string_view rootPath;
   public:
-    DumpUploader(auto& router)
+    DumpUploader(auto& router,auto root):rootPath(root)
     {
         router.add_get_handler(
             "/redfish/v1/Systems/system/LogServices/Dump/{filename}/Entries",
@@ -24,7 +25,7 @@ class DumpUploader
         chai::http::file_body::value_type body;
 
         auto filetofetch = std::filesystem::path(
-                               "/Users/abhilashraju/work/cpp/chaiproxy/build/")
+                               rootPath)
                                .c_str() +
                            httpfunc["filename"];
         chai::beast::error_code ec{};
