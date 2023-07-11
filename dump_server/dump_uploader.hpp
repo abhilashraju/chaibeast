@@ -12,8 +12,9 @@ namespace redfish
 class DumpUploader
 {
     std::string_view rootPath;
+
   public:
-    DumpUploader(auto& router,auto root):rootPath(root)
+    DumpUploader(auto& router, auto root) : rootPath(root)
     {
         router.add_get_handler(
             "/redfish/v1/Systems/system/LogServices/Dump/{filename}/Entries",
@@ -24,9 +25,7 @@ class DumpUploader
     {
         chai::http::file_body::value_type body;
 
-        auto filetofetch = std::filesystem::path(
-                               rootPath)
-                               .c_str() +
+        auto filetofetch = std::filesystem::path(rootPath).c_str() +
                            httpfunc["filename"];
         chai::beast::error_code ec{};
         body.open(filetofetch.data(), chai::beast::file_mode::scan, ec);
@@ -40,11 +39,13 @@ class DumpUploader
         chai::http::response<chai::http::file_body> res{
             std::piecewise_construct, std::make_tuple(std::move(body)),
             std::make_tuple(http::status::ok, req.version())};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.content_length(size);
-        res.prepare_payload();
-        return res;
+        http::response_parser<http::file_body> parser{std::move(res)};
+        parser.body_limit((std::numeric_limits<std::uint64_t>::max)());
+        parser.get().set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        parser.get().set(http::field::content_type, "text/plain");
+        parser.get().content_length(size);
+        parser.get().prepare_payload();
+        return parser.release();
     }
 };
 

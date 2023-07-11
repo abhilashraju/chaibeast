@@ -146,10 +146,11 @@ struct CommonForwarderImpl : AbstractForwarder
         }
     };
     VariantResponse readAsFile(STREAM_TYPE& stream, beast::flat_buffer& buffer,
-                               http::response_parser<http::empty_body>& res0,
+                               http::response_parser<http::string_body>& res0,
                                auto& ec) const
     {
         http::response_parser<http::file_body> res{std::move(res0)};
+        res.body_limit((std::numeric_limits<std::uint64_t>::max)());
         http::file_body::value_type file;
         file.open("tmp", beast::file_mode::write, ec);
         checkFail(ec);
@@ -165,12 +166,12 @@ struct CommonForwarderImpl : AbstractForwarder
 
     {
         // Start with an empty_body parser
-        http::response_parser<http::empty_body> res0;
+        http::response_parser<http::string_body> res0;
         // Read just the header. Otherwise, the empty_body
         // would generate an error if body octets were received.
         // res0.skip(true);
         http::read_header(stream, buffer, res0, ec);
-        checkFail(ec);
+        // checkFail(ec);
 
         constexpr int Threshold = 8000;
         if (res0.content_length())
