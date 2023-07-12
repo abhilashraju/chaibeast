@@ -34,27 +34,7 @@ int main(int argc, const char* argv[])
     HttpServer server(port);
 #endif
 
-    auto plain_text_handler = [](auto func) {
-        return [func = std::move(func)](const auto& req, const auto& httpfunc) {
-            http::response<http::string_body> resp{http::status::ok,
-                                                   version(req)};
-            resp.set(http::field::content_type, "text/plain");
-            resp.body() = func(req, httpfunc);
-            resp.set(http::field::content_length,
-                     std::to_string(resp.body().length()));
-            return resp;
-        };
-    };
-
-    server.router().add_get_handler(
-        "/hello", plain_text_handler([](auto& req, auto& httpfunc) {
-            return "<B>Hello World</B>";
-        }));
-    server.router().add_get_handler(
-        "/infinite", plain_text_handler([](auto& req, auto& httpfunc) {
-            std::this_thread::sleep_for(std::chrono::seconds(100));
-            return "<B>infinite</B>";
-        }));
+    
     DumpUploader uploader(server.router(),root);
     server.start(threadPool);
     return 0;

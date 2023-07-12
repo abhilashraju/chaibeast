@@ -12,7 +12,7 @@ int main(int argc, const char* argv[])
         std::cout << "Please use\n reverseproxy -p port -c config.json_path \n";
         return 0;
     }
-    exec::single_thread_context threadPool;
+    exec::static_thread_pool threadPool;
     // Create the server endpoint
     if (config.empty())
     {
