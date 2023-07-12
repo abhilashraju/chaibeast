@@ -23,10 +23,8 @@ int main(int argc, const char* argv[])
 
 #ifdef SSL_ON
     SSlServer server(
-        p, router,
-        "/Users/abhilashraju/work/cpp/chai/certs/server-certificate.pem",
-        "/Users/abhilashraju/work/cpp/chai/certs/server-private-key.pem",
-        "/etc/ssl/certs/authority");
+        p, router,"/etc/ssl/certs/https/server.pem",
++            "/etc/ssl/certs/https/server.pem", "/etc/ssl/certs/authority");
 #else
     TCPServer server(p, router);
 #endif

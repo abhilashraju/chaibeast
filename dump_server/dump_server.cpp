@@ -28,9 +28,8 @@ int main(int argc, const char* argv[])
     exec::static_thread_pool threadPool;
 #ifdef SSL_ON
     HttpsServer server(
-        port, "/Users/abhilashraju/work/cpp/chai/certs/server-certificate.pem",
-        "/Users/abhilashraju/work/cpp/chai/certs/server-private-key.pem",
-        "/etc/ssl/certs/authority");
+        port, "/etc/ssl/certs/https/server.pem",
++            "/etc/ssl/certs/https/server.pem", "/etc/ssl/certs/authority");
 #else
     HttpServer server(port);
 #endif

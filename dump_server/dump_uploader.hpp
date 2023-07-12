@@ -19,19 +19,18 @@ class DumpUploader
         router.add_get_handler(
             "/redfish/v1/Systems/system/LogServices/Dump/{filename}/Entries",
             std::bind_front(&DumpUploader::processUpload, this));
+        router.add_get_handler(
+            "/redfish/v1/Systems/system/LogServices/Dump/Entries",
+            std::bind_front(&DumpUploader::entries, this));
     }
-    chai::VariantResponse processUpload(const chai::DynamicbodyRequest& req,
-                                        const chai::http_function& httpfunc)
+    auto fetchFile(const chai::DynamicbodyRequest& req,const std::string& filetofetch)
     {
         chai::http::file_body::value_type body;
-
-        auto filetofetch = std::filesystem::path(rootPath).c_str() +
-                           httpfunc["filename"];
         chai::beast::error_code ec{};
         body.open(filetofetch.data(), chai::beast::file_mode::scan, ec);
         if (ec == chai::beast::errc::no_such_file_or_directory)
         {
-            throw chai::file_not_found(httpfunc["filename"]);
+            throw chai::file_not_found(filetofetch);
         }
         const auto size = body.size();
 
@@ -46,6 +45,23 @@ class DumpUploader
         parser.get().content_length(size);
         parser.get().prepare_payload();
         return parser.release();
+    }
+    chai::VariantResponse processUpload(const chai::DynamicbodyRequest& req,
+                                        const chai::http_function& httpfunc)
+    {
+        
+
+        auto filetofetch = std::filesystem::path(rootPath).c_str() +
+                           httpfunc["filename"];
+        return fetchFile(req,filetofetch);
+    }
+    chai::VariantResponse entries(const chai::DynamicbodyRequest& req,
+                                        const chai::http_function& httpfunc)
+    {
+        chai::http::file_body::value_type body;
+
+        auto filetofetch = std::filesystem::path(rootPath).c_str() +std::string("Entries");
+        return fetchFile(req,filetofetch);
     }
 };
 
