@@ -1,5 +1,6 @@
 #pragma once
 #include "common_defs.hpp"
+
 #include <chrono>
 namespace chai
 {
@@ -125,7 +126,8 @@ struct GenericForwarderImpl : AbstractForwarder
         // Receive the response from the target server
     }
 };
-inline std::string getLocalTime(){
+inline std::string getLocalTime()
+{
     auto now = std::chrono::system_clock::now();
     std::time_t current_time = std::chrono::system_clock::to_time_t(now);
     std::tm* current_tm = std::localtime(&current_time);
@@ -157,35 +159,30 @@ struct CommonForwarderImpl : AbstractForwarder
         }
     };
     VariantResponse readFromUrl(STREAM_TYPE& stream, beast::flat_buffer& buffer,
-                               http::response_parser<http::string_body>& res0,
-                               auto& ec) const
+                                http::response_parser<http::string_body>& res0,
+                                auto& ec) const
     {
-        
-
         chai::http::file_body::value_type body;
-        
-        body.open(res0.get()["fileurl"].data(), chai::beast::file_mode::scan, ec);
+        std::string url = res0.get()["fileurl"];
+        body.open(url.data(), chai::beast::file_mode::scan, ec);
         checkFail(ec);
         const auto size = body.size();
 
-       
         http::response_parser<http::file_body> parser{std::move(res0)};
         parser.body_limit((std::numeric_limits<std::uint64_t>::max)());
         parser.get().body() = std::move(body);
         parser.get().content_length(size);
         parser.get().prepare_payload();
         return parser.release();
-        
     }
     VariantResponse readAsFile(STREAM_TYPE& stream, beast::flat_buffer& buffer,
                                http::response_parser<http::string_body>& res0,
                                auto& ec) const
     {
-        
         http::response_parser<http::file_body> res{std::move(res0)};
         res.body_limit((std::numeric_limits<std::uint64_t>::max)());
         http::file_body::value_type file;
-        auto tempFileName=getLocalTime();
+        auto tempFileName = getLocalTime();
         file.open(tempFileName.c_str(), beast::file_mode::write, ec);
         checkFail(ec);
         res.get().body() = std::move(file);
@@ -210,7 +207,7 @@ struct CommonForwarderImpl : AbstractForwarder
         constexpr int Threshold = 8000;
         if (res0.content_length())
         {
-            if(!res0.get()["fileurl"].empty())
+            if (!res0.get()["fileurl"].empty())
             {
                 return readFromUrl(stream, buffer, res0, ec);
             }
