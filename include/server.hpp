@@ -131,19 +131,20 @@ struct SslStreamMaker
     void acceptAsyncConnection(net::io_context& ioContext,
                                tcp::acceptor& acceptor, auto work)
     {
-        auto do_accept =
-            [&ioContext, work, this, &acceptor](net::yield_context yield) {
-            while (true)
+        auto do_accept = [&ioContext, work, this,
+                          &acceptor](auto accept, net::yield_context yield) {
+            // while (true)
             {
                 ssl::stream<tcp::socket> stream(ioContext, sslContext);
                 beast::error_code ec{};
                 acceptor.async_accept(stream.next_layer(), yield);
                 if (checkFailed(ec))
                 {
-                    continue;
+                    net::spawn(&ioContext, std::bind_front(accept, accept));
+                    return;
                 }
                 auto do_handshake =
-                    [&ioContext, work,
+                    [accept, &ioContext, work,
                      reader = SSlStreamReader(std::move(stream))](
                         net::yield_context yield) mutable {
                     beast::error_code ec{};
@@ -151,18 +152,21 @@ struct SslStreamMaker
                                                   yield[ec]);
                     if (checkFailed(ec))
                     {
+                        net::spawn(&ioContext, std::bind_front(accept, accept));
                         return;
                     }
-                    auto do_work = [work, reader = std::move(reader)](
-                                       net::yield_context yield) mutable {
+                    auto do_work =
+                        [accept, &ioContext, work, reader = std::move(reader)](
+                            net::yield_context yield) mutable {
                         work(std::move(reader));
+                        net::spawn(&ioContext, std::bind_front(accept, accept));
                     };
                     net::spawn(ioContext, std::move(do_work));
                 };
                 net::spawn(ioContext, std::move(do_handshake));
             }
         };
-        net::spawn(ioContext, do_accept);
+        net::spawn(ioContext, std::bind_front(do_accept, do_accept));
     }
 };
 #endif
@@ -288,11 +292,13 @@ inline auto waitForAsyncConnection(auto& ioContext, auto& pool, auto& router,
         [&ioContext, &pool, &streamMaker, &router](auto acceptor) {
         try
         {
-            auto asyncWork = [&pool, &router](auto stream) {
+            auto asyncWork =
+                [&ioContext, &pool, &router, &streamMaker](auto stream) {
                 auto work = makeConnectionHandler(std::move(stream), router);
                 auto snd = stdexec::on(pool.get_scheduler(), std::move(work));
                 stdexec::start_detached(std::move(snd));
                 // stdexec::sync_wait(std::move(work));
+                // waitForAsyncConnection(ioContext, pool, router, streamMaker);
             };
             streamMaker.acceptAsyncConnection(ioContext, acceptor,
                                               std::move(asyncWork));
