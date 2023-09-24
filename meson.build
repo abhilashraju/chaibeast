@@ -14,7 +14,7 @@ openssl_dep = dependency('openssl', version: '>=1.1.1')
 boost_dep = dependency('boost',modules: ['coroutine'])
 
 #boost_lib_path = boost_dep.get_pkgconfig_variable('libdir')
-boost_lib_path='/opt/homebrew/Cellar/boost/1.82.0/lib'
+#boost_lib_path='/opt/homebrew/Cellar/boost/1.82.0/lib'
 subdir('reverseproxy')
 #subdir('fileserver')
 subdir('dump_server')
