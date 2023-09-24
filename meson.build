@@ -12,7 +12,11 @@ CHAI_ARGS=['-DSSL_ON']
 #CHAI_ARGS=[]
 openssl_dep = dependency('openssl', version: '>=1.1.1')
 boost_dep = dependency('boost',modules: ['coroutine'])
-
+chaibeast_includes = include_directories(['./include','./include/stdexec/include/','include'])
+chaibeast_dep = declare_dependency(
+	include_directories : chaibeast_includes,
+	dependencies : [dependency('threads'),openssl_dep,boost_dep]
+)
 #boost_lib_path = boost_dep.get_pkgconfig_variable('libdir')
 #boost_lib_path='/opt/homebrew/Cellar/boost/1.82.0/lib'
 subdir('reverseproxy')

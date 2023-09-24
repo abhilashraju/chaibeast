@@ -53,10 +53,22 @@ struct HttpRouter
         add_handler({{path.data(), path.length()}, http::verb::post},
                     (FUNC&&)h);
     }
+    template <DynBodyRequestHandler Handler>
+    void add_post_handler(std::string_view path, Handler&& h)
+    {
+        add_handler({{path.data(), path.length()}, http::verb::post},
+                    DynamicBodyHandler()((Handler&&)h));
+    }
     template <typename FUNC>
     void add_put_handler(std::string_view path, FUNC&& h)
     {
         add_handler({{path.data(), path.length()}, http::verb::put}, (FUNC&&)h);
+    }
+    template <DynBodyRequestHandler Handler>
+    void add_put_handler(std::string_view path, Handler&& h)
+    {
+        add_handler({{path.data(), path.length()}, http::verb::put},
+                    DynamicBodyHandler()((Handler&&)h));
     }
     template <typename FUNC>
     void add_delete_handler(std::string_view path, FUNC&& h)
