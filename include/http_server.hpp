@@ -59,6 +59,13 @@ struct HttpRouter
         add_handler({{path.data(), path.length()}, http::verb::post},
                     DynamicBodyHandler()((Handler&&)h));
     }
+    template <StringBodyRequestHandler Handler>
+    void add_post_handler(std::string_view path, Handler&& h)
+    {
+        add_handler({{path.data(), path.length()}, http::verb::post},
+                    StringBodyHandler()((Handler&&)h));
+    }
+
     template <typename FUNC>
     void add_put_handler(std::string_view path, FUNC&& h)
     {

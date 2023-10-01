@@ -67,6 +67,7 @@ struct BodyHandlerImpl
     }
 };
 using DynamicBodyHandler = BodyHandlerImpl<DynamicbodyRequest>;
+using StringBodyHandler = BodyHandlerImpl<StringbodyRequest>;
 
 template <typename Moveonly>
 struct CopyableMoveWrapper

@@ -12,5 +12,11 @@ concept DynBodyRequestHandler =
             h(r, f)
         } -> std::same_as<VariantResponse>;
     };
-
+template <typename Handler>
+concept StringBodyRequestHandler =
+    requires(Handler h, const StringbodyRequest& r, const http_function& f) {
+        {
+            h(r, f)
+        } -> std::same_as<VariantResponse>;
+    };
 } // namespace chai
