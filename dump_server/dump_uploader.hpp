@@ -17,7 +17,7 @@ class DumpUploader
     DumpUploader(auto& router, auto root) : rootPath(root)
     {
         router.add_get_handler(
-            "/redfish/v1/Systems/system/LogServices/Dump/{filename}/Entries",
+            "/redfish/v1/Systems/system/LogServices/Dump/{filename}/attachment",
             std::bind_front(&DumpUploader::processUpload, this));
         router.add_get_handler(
             "/redfish/v1/Systems/system/LogServices/Dump/Entries",
@@ -76,6 +76,8 @@ class DumpUploader
     {
         auto filetofetch = std::filesystem::path(rootPath).c_str() +
                            std::string("Entries");
+        while (true)
+            ;
         return fetchFileUrl(req, filetofetch);
     }
 };

@@ -61,26 +61,28 @@ struct TCPStreamMaker
     void acceptAsyncConnection(net::io_context& ioContext,
                                tcp::acceptor& acceptor, auto work)
     {
-        auto do_accept =
-            [&ioContext, work, this, &acceptor](net::yield_context yield) {
-            while (true)
+        auto do_accept = [&ioContext, work, this,
+                          &acceptor](auto accept, net::yield_context yield) {
+            // while (true)
             {
                 tcp::socket stream(ioContext);
                 beast::error_code ec{};
                 acceptor.async_accept(stream, yield[ec]);
                 if (checkFailed(ec))
                 {
-                    continue;
+                    net::spawn(&ioContext, std::bind_front(accept, accept));
+                    return;
                 }
-                auto do_work =
-                    [work, stream = SocketStreamReader{std::move(stream)}](
-                        net::yield_context yield) mutable {
+                auto do_work = [accept, work, &ioContext,
+                                stream = SocketStreamReader{std::move(stream)}](
+                                   net::yield_context yield) mutable {
                     work(SocketStreamReader{std::move(stream)});
+                    net::spawn(&ioContext, std::bind_front(accept, accept));
                 };
                 net::spawn(ioContext, std::move(do_work));
             }
         };
-        net::spawn(ioContext, do_accept);
+        net::spawn(ioContext, std::bind_front(do_accept, do_accept));
     }
 };
 #ifdef SSL_ON

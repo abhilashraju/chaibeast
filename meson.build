@@ -8,8 +8,8 @@ project(
     'cpp_std=c++20',
   ])
 
-CHAI_ARGS=['-DSSL_ON']
-#CHAI_ARGS=[]
+#CHAI_ARGS=['-DSSL_ON']
+CHAI_ARGS=[]
 openssl_dep = dependency('openssl', version: '>=1.1.1')
 boost_dep = dependency('boost',modules: ['coroutine'])
 chaibeast_includes = include_directories(['./include','./include/stdexec/include/','include'])
