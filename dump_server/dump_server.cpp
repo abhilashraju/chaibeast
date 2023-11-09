@@ -18,7 +18,7 @@ using namespace redfish;
 int main(int argc, const char* argv[])
 {
     // Create a server endpoint
-    auto [port,root] = getArgs(parseCommandline(argc, argv), "-p","-r");
+    auto [port, root] = getArgs(parseCommandline(argc, argv), "-p", "-r");
     if (port.empty())
     {
         std::cout << "Invalid arguments\n";
@@ -28,14 +28,14 @@ int main(int argc, const char* argv[])
     exec::static_thread_pool threadPool;
 #ifdef SSL_ON
     HttpsServer server(
-        port, "/etc/ssl/certs/https/server.pem",
-+            "/etc/ssl/certs/https/server.pem", "/etc/ssl/certs/authority");
+        port, "/Users/abhilashraju/work/cpp/chai/certs/server-certificate.pem",
+        "/Users/abhilashraju/work/cpp/chai/certs/server-private-key.pem",
+        "/etc/ssl/certs/authority");
 #else
     HttpServer server(port);
 #endif
 
-    
-    DumpUploader uploader(server.router(),root);
+    DumpUploader uploader(server.router(), root);
     server.start(threadPool);
     return 0;
 }

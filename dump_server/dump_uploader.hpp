@@ -23,7 +23,8 @@ class DumpUploader
             "/redfish/v1/Systems/system/LogServices/Dump/Entries",
             std::bind_front(&DumpUploader::entries, this));
     }
-    auto fetchFile(const chai::DynamicbodyRequest& req,const std::string& filetofetch)
+    auto fetchFile(const chai::DynamicbodyRequest& req,
+                   const std::string& filetofetch)
     {
         chai::http::file_body::value_type body;
         chai::beast::error_code ec{};
@@ -38,27 +39,25 @@ class DumpUploader
         chai::http::response<chai::http::file_body> res{
             std::piecewise_construct, std::make_tuple(std::move(body)),
             std::make_tuple(http::status::ok, req.version())};
-        http::response_parser<http::file_body> parser{std::move(res)};
-        parser.body_limit((std::numeric_limits<std::uint64_t>::max)());
+        http::response_serializer<http::file_body> parser{res};
+        // parser.body_limit((std::numeric_limits<std::uint64_t>::max)());
         parser.get().set(http::field::server, BOOST_BEAST_VERSION_STRING);
         parser.get().set(http::field::content_type, "text/plain");
         parser.get().content_length(size);
         parser.get().prepare_payload();
-        return parser.release();
+        return parser;
     }
-    auto fetchFileUrl(const chai::DynamicbodyRequest& req,const std::string& filetofetch)
+    auto fetchFileUrl(const chai::DynamicbodyRequest& req,
+                      const std::string& filetofetch)
     {
-       
-        
         if (!std::filesystem::exists(filetofetch))
         {
             throw chai::file_not_found(filetofetch);
         }
-     
 
         // Respond to GET request
-        chai::http::response<chai::http::string_body> res{
-            http::status::ok, req.version()};
+        chai::http::response<chai::http::string_body> res{http::status::ok,
+                                                          req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
         res.insert("fileurl", filetofetch);
         res.content_length(0);
@@ -68,19 +67,16 @@ class DumpUploader
     chai::VariantResponse processUpload(const chai::DynamicbodyRequest& req,
                                         const chai::http_function& httpfunc)
     {
-        
-
         auto filetofetch = std::filesystem::path(rootPath).c_str() +
                            httpfunc["filename"];
-        return fetchFileUrl(req,filetofetch);
+        return fetchFileUrl(req, filetofetch);
     }
     chai::VariantResponse entries(const chai::DynamicbodyRequest& req,
-                                        const chai::http_function& httpfunc)
+                                  const chai::http_function& httpfunc)
     {
-        
-
-        auto filetofetch = std::filesystem::path(rootPath).c_str() +std::string("Entries");
-        return fetchFileUrl(req,filetofetch);
+        auto filetofetch = std::filesystem::path(rootPath).c_str() +
+                           std::string("Entries");
+        return fetchFileUrl(req, filetofetch);
     }
 };
 

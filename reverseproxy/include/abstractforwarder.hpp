@@ -167,8 +167,7 @@ struct CommonForwarderImpl : AbstractForwarder
         body.open(url.data(), chai::beast::file_mode::scan, ec);
         checkFail(ec);
         const auto size = body.size();
-
-        http::response_parser<http::file_body> parser{std::move(res0)};
+        http::response_parser<chai::http::file_body> parser{std::move(res0)};
         parser.body_limit((std::numeric_limits<std::uint64_t>::max)());
         parser.get().body() = std::move(body);
         parser.get().content_length(size);

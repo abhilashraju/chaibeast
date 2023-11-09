@@ -19,12 +19,13 @@ int main(int argc, const char* argv[])
         config = "config.json";
     }
     RequestForwarder router({config.data(), config.length()});
-    "/etc/ssl/certs/https/server.pem";
 
 #ifdef SSL_ON
     SSlServer server(
-        p, router,"/etc/ssl/certs/https/server.pem",
-+            "/etc/ssl/certs/https/server.pem", "/etc/ssl/certs/authority");
+        p, router,
+        "/Users/abhilashraju/work/cpp/chai/certs/server-certificate.pem",
+        "/Users/abhilashraju/work/cpp/chai/certs/server-private-key.pem",
+        "/etc/ssl/certs/authority");
 #else
     TCPServer server(p, router);
 #endif

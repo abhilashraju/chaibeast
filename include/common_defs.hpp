@@ -1,31 +1,28 @@
 #pragma once
-#include <boost/asio.hpp>
+#include "beast_defs.hpp"
+
 #include <boost/asio/spawn.hpp>
-#include <boost/beast/core.hpp>
-#include <boost/beast/http.hpp>
 
 #include <iostream>
 #ifdef SSL_ON
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/beast/ssl.hpp>
 #endif
+#include "base64_file_body.hpp"
+
 #include <boost/beast/version.hpp>
 namespace chai
 {
 
-namespace beast = boost::beast;
-namespace http = beast::http;
-namespace net = boost::asio;
-namespace ssl = boost::asio::ssl;
-using tcp = net::ip::tcp;
-
+using FilebodyBase64Response = http::response<base64_file_body>;
 using FilebodyResponse = http::response<http::file_body>;
 using StringbodyResponse = http::response<http::string_body>;
 using DynamicbodyResponse = http::response<http::dynamic_body>;
 using EmptybodyResponse = http::response<http::empty_body>;
 
-using VariantResponse = std::variant<EmptybodyResponse, FilebodyResponse,
-                                     StringbodyResponse, DynamicbodyResponse>;
+using VariantResponse =
+    std::variant<EmptybodyResponse, FilebodyResponse, FilebodyBase64Response,
+                 StringbodyResponse, DynamicbodyResponse>;
 using FilebodyRequest = http::request<http::file_body>;
 using StringbodyRequest = http::request<http::string_body>;
 using DynamicbodyRequest = http::request<http::dynamic_body>;
