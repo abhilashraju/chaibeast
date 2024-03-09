@@ -25,15 +25,18 @@ struct TCPStreamMaker
 {
     struct SocketStreamReader
     {
-        tcp::socket stream;
+        std::unique_ptr<net::io_context> ctx{
+            std::make_unique<net::io_context>()};
+        tcp::socket stream_{*ctx};
+        SocketStreamReader() {}
         SocketStreamReader(const SocketStreamReader&) = delete;
         SocketStreamReader(SocketStreamReader&&) = default;
-        SocketStreamReader(tcp::socket&& s) : stream(std::move(s)) {}
+        // SocketStreamReader(tcp::socket&& s) : stream(std::move(s)) {}
         auto read(beast::error_code& ec)
         {
             beast::flat_buffer buffer;
             DynamicbodyRequest request;
-            http::read(stream, buffer, request, ec);
+            http::read(stream_, buffer, request, ec);
             return VariantRequest{std::move(request)};
         }
         auto read()
@@ -48,40 +51,43 @@ struct TCPStreamMaker
         }
         void close(beast::error_code& ec)
         {
-            stream.close();
+            stream_.close();
+        }
+        tcp::socket& stream()
+        {
+            return stream_;
         }
     };
     SocketStreamReader acceptConnection(net::io_context& ioContext,
                                         tcp::acceptor& acceptor)
     {
-        tcp::socket clientSocket(ioContext);
-        acceptor.accept(clientSocket);
-        return SocketStreamReader{std::move(clientSocket)};
+        SocketStreamReader reader;
+        acceptor.accept(reader.stream());
+        return reader;
     }
     void acceptAsyncConnection(net::io_context& ioContext,
                                tcp::acceptor& acceptor, auto work)
     {
         auto do_accept = [&ioContext, work, this,
                           &acceptor](auto accept, net::yield_context yield) {
-            // while (true)
+            SocketStreamReader reader;
+            beast::error_code ec{};
+            acceptor.async_accept(reader.stream(), yield);
+            if (checkFailed(ec))
             {
-                tcp::socket stream(ioContext);
-                beast::error_code ec{};
-                acceptor.async_accept(stream, yield[ec]);
-                if (checkFailed(ec))
-                {
-                    net::spawn(&ioContext, std::bind_front(accept, accept));
-                    return;
-                }
-                auto do_work = [accept, work, &ioContext,
-                                stream = SocketStreamReader{std::move(stream)}](
-                                   net::yield_context yield) mutable {
-                    work(SocketStreamReader{std::move(stream)});
-                    net::spawn(&ioContext, std::bind_front(accept, accept));
-                };
-                net::spawn(ioContext, std::move(do_work));
+                net::spawn(&ioContext, std::bind_front(accept, accept));
+                return;
             }
+
+            auto do_work =
+                [accept, &ioContext, work,
+                 reader = std::move(reader)](net::yield_context yield) mutable {
+                work(std::move(reader));
+                net::spawn(&ioContext, std::bind_front(accept, accept));
+            };
+            net::spawn(ioContext, std::move(do_work));
         };
+
         net::spawn(ioContext, std::bind_front(do_accept, do_accept));
     }
 };
@@ -90,15 +96,17 @@ struct SslStreamMaker
 {
     struct SSlStreamReader
     {
-        ssl::stream<tcp::socket> stream;
+        std::unique_ptr<net::io_context> ctx{
+            std::make_unique<net::io_context>()};
+        ssl::stream<tcp::socket> stream_;
         SSlStreamReader(const SSlStreamReader&) = delete;
         SSlStreamReader(SSlStreamReader&&) = default;
-        SSlStreamReader(ssl::stream<tcp::socket>&& s) : stream(std::move(s)) {}
+        SSlStreamReader(ssl::context& sslContext) : stream_(*ctx, sslContext) {}
         auto read(beast::error_code& ec)
         {
             beast::flat_buffer buffer;
             http::request<http::dynamic_body> request;
-            http::read(stream, buffer, request, ec);
+            http::read(stream_, buffer, request, ec);
             return VariantRequest{std::move(request)};
         }
         auto read()
@@ -113,8 +121,12 @@ struct SslStreamMaker
         }
         void close(beast::error_code& ec)
         {
-            stream.shutdown(ec);
-            stream.next_layer().close();
+            stream_.shutdown(ec);
+            stream_.next_layer().close();
+        }
+        ssl::stream<tcp::socket>& stream()
+        {
+            return stream_;
         }
     };
     ssl::context sslContext;
@@ -125,48 +137,44 @@ struct SslStreamMaker
     SSlStreamReader acceptConnection(net::io_context& ioContext,
                                      tcp::acceptor& acceptor)
     {
-        ssl::stream<tcp::socket> clientSocket(ioContext, sslContext);
-        acceptor.accept(clientSocket.next_layer());
-        clientSocket.handshake(ssl::stream_base::server);
-        return SSlStreamReader{std::move(clientSocket)};
+        SSlStreamReader reader(sslContext);
+        acceptor.accept(reader.stream().next_layer());
+        reader.stream().handshake(ssl::stream_base::server);
+        return reader;
     }
     void acceptAsyncConnection(net::io_context& ioContext,
                                tcp::acceptor& acceptor, auto work)
     {
         auto do_accept = [&ioContext, work, this,
                           &acceptor](auto accept, net::yield_context yield) {
-            // while (true)
+            SSlStreamReader reader(sslContext);
+            beast::error_code ec{};
+            acceptor.async_accept(reader.stream().next_layer(), yield);
+            if (checkFailed(ec))
             {
-                ssl::stream<tcp::socket> stream(ioContext, sslContext);
+                net::spawn(&ioContext, std::bind_front(accept, accept));
+                return;
+            }
+            auto do_handshake =
+                [accept, &ioContext, work,
+                 reader = std::move(reader)](net::yield_context yield) mutable {
                 beast::error_code ec{};
-                acceptor.async_accept(stream.next_layer(), yield);
+                reader.stream().async_handshake(ssl::stream_base::server,
+                                                yield[ec]);
                 if (checkFailed(ec))
                 {
                     net::spawn(&ioContext, std::bind_front(accept, accept));
                     return;
                 }
-                auto do_handshake =
-                    [accept, &ioContext, work,
-                     reader = SSlStreamReader(std::move(stream))](
-                        net::yield_context yield) mutable {
-                    beast::error_code ec{};
-                    reader.stream.async_handshake(ssl::stream_base::server,
-                                                  yield[ec]);
-                    if (checkFailed(ec))
-                    {
-                        net::spawn(&ioContext, std::bind_front(accept, accept));
-                        return;
-                    }
-                    auto do_work =
-                        [accept, &ioContext, work, reader = std::move(reader)](
-                            net::yield_context yield) mutable {
-                        work(std::move(reader));
-                        net::spawn(&ioContext, std::bind_front(accept, accept));
-                    };
-                    net::spawn(ioContext, std::move(do_work));
+                auto do_work = [accept, &ioContext, work,
+                                reader = std::move(reader)](
+                                   net::yield_context yield) mutable {
+                    work(std::move(reader));
+                    net::spawn(&ioContext, std::bind_front(accept, accept));
                 };
-                net::spawn(ioContext, std::move(do_handshake));
-            }
+                net::spawn(ioContext, std::move(do_work));
+            };
+            net::spawn(ioContext, std::move(do_handshake));
         };
         net::spawn(ioContext, std::bind_front(do_accept, do_accept));
     }
@@ -228,7 +236,7 @@ inline auto sendResponse(auto& clientSocket)
         return std::visit(
             [&](auto&& res) {
             http::write(clientSocket, std::forward<decltype(res)>(res));
-            },
+        },
             resVar);
     });
 }
@@ -242,8 +250,8 @@ inline void handleClientRequest(auto clientSocket, auto& router)
 {
     auto work = handleRead(clientSocket) | selectForwarder(router) |
                 processRequest() | handle_error(ProcessApplicationError{}) |
-                sendResponse(clientSocket.stream) | handleFinish(clientSocket) |
-                handle_error(ProcessSystemError{});
+                sendResponse(clientSocket.stream()) |
+                handleFinish(clientSocket) | handle_error(ProcessSystemError{});
 
     stdexec::sync_wait(work);
 }
@@ -251,19 +259,19 @@ inline void handleClientRequest(auto clientSocket, auto& router)
 inline auto makeAcceptor(auto& ioContext, auto& endpoint)
 {
     return stdexec::just() | stdexec::then([&]() {
-               tcp::acceptor acceptor(ioContext, endpoint);
-               acceptor.listen();
-               std::cout << "Proxy server started. Listening on port "
-                         << endpoint.port() << "\n";
-               return acceptor;
-           });
+        tcp::acceptor acceptor(ioContext, endpoint);
+        acceptor.listen();
+        std::cout << "Proxy server started. Listening on port "
+                  << endpoint.port() << "\n";
+        return acceptor;
+    });
 }
 inline auto makeConnectionHandler(auto clientSock, auto& router)
 {
     return stdexec::just(std::move(clientSock)) |
            stdexec::then([&router](auto clientSock) {
-               handleClientRequest(std::move(clientSock), router);
-           });
+        handleClientRequest(std::move(clientSock), router);
+    });
 }
 inline auto waitForConnection(auto& ioContext, auto& pool, auto& router,
                               auto& streamMaker)
@@ -294,8 +302,8 @@ inline auto waitForAsyncConnection(auto& ioContext, auto& pool, auto& router,
         [&ioContext, &pool, &streamMaker, &router](auto acceptor) {
         try
         {
-            auto asyncWork =
-                [&ioContext, &pool, &router, &streamMaker](auto stream) {
+            auto asyncWork = [&ioContext, &pool, &router,
+                              &streamMaker](auto stream) {
                 auto work = makeConnectionHandler(std::move(stream), router);
                 auto snd = stdexec::on(pool.get_scheduler(), std::move(work));
                 stdexec::start_detached(std::move(snd));

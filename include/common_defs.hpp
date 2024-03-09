@@ -58,7 +58,7 @@ struct BodyHandlerImpl
                 }
                 throw std::runtime_error("Requested Type miss match");
                 return chai::VariantResponse{};
-                },
+            },
                 req);
         };
     }

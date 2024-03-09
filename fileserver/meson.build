@@ -4,6 +4,6 @@ executable(
   'fileserver',
   'fileserver.cpp',
   include_directories: fileserver_includes,
-  dependencies:[openssl_dep,boost_dep],
+  dependencies:[openssl_dep,boost_dep,chaibeast_dep],
   install: true,
   install_dir: get_option('bindir'),cpp_args : '-DSSL=0')

@@ -1,4 +1,6 @@
 
+#include <exec/static_thread_pool.hpp>
+#include <stdexec/execution.hpp>
 #include "command_line_parser.hpp"
 #include "request_forwarder.hpp"
 #include "server.hpp"

@@ -76,8 +76,6 @@ class DumpUploader
     {
         auto filetofetch = std::filesystem::path(rootPath).c_str() +
                            std::string("Entries");
-        while (true)
-            ;
         return fetchFileUrl(req, filetofetch);
     }
 };
