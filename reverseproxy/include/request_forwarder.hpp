@@ -111,13 +111,12 @@ struct RequestForwarder
     AbstractForwarder* wildCardMatch(const std::string& path) const
     {
         std::string_view pathview(path);
-        auto wildcarkeys =
-            table | std::views::keys | std::views::filter([](auto& a) {
-                return std::string_view(a).ends_with("*");
-            }) |
-            std::views::transform([](auto& a) {
-                return std::string_view(a).substr(0, a.length() - 1);
-            });
+        auto wildcarkeys = table | std::views::keys |
+                           std::views::filter([](auto& a) {
+            return std::string_view(a).ends_with("*");
+        }) | std::views::transform([](auto& a) {
+            return std::string_view(a).substr(0, a.length() - 1);
+        });
         auto iter = std::ranges::find_if(
             wildcarkeys, [&](auto a) { return pathview.starts_with(a); });
         if (iter != wildcarkeys.end())
@@ -126,7 +125,7 @@ struct RequestForwarder
         }
         return nullptr;
     }
-    AbstractForwarder* get(const std::string& path) const
+    AbstractForwarder* getForwarder(const std::string& path) const
     {
         if (auto matched = wildCardMatch(path); matched != nullptr)
         {

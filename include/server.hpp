@@ -35,7 +35,7 @@ struct TCPStreamMaker
         auto read(beast::error_code& ec)
         {
             beast::flat_buffer buffer;
-            DynamicbodyRequest request;
+            StringbodyRequest request;
             http::read(stream_, buffer, request, ec);
             return VariantRequest{std::move(request)};
         }
@@ -243,7 +243,8 @@ inline auto sendResponse(auto& clientSocket)
 inline auto selectForwarder(auto& router)
 {
     return stdexec::then([&router](auto request) {
-        return std::make_pair(router.get(target(request)), std::move(request));
+        return std::make_pair(router.getForwarder(target(request)),
+                              std::move(request));
     });
 }
 inline void handleClientRequest(auto clientSocket, auto& router)

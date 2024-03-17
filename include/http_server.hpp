@@ -118,7 +118,7 @@ struct HttpRouter
         return process_request(req);
     }
 
-    HttpRouter* get(const std::string& path)
+    HttpRouter* getForwarder(const std::string& path)
     {
         return this;
     }
