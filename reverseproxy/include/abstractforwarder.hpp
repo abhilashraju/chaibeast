@@ -6,7 +6,7 @@ namespace chai
 {
 struct AbstractForwarder
 {
-    virtual VariantResponse operator()(VariantRequest& request) const = 0;
+    virtual VariantResponse operator()(VariantRequest&& request) const = 0;
     virtual ~AbstractForwarder(){};
 };
 struct HeaderReader
@@ -101,7 +101,7 @@ struct GenericForwarderImpl : AbstractForwarder
                                      ec.message());
         }
     };
-    VariantResponse operator()(VariantRequest& requestVar) const
+    VariantResponse operator()(VariantRequest&& requestVar) const
     {
         net::io_context ioContext;
         auto forwarderStream = streamBuilder.beginStream(ioContext, target,
@@ -110,13 +110,13 @@ struct GenericForwarderImpl : AbstractForwarder
             [&](auto&& req) {
             // Forward the request to the target server
             http::write(forwarderStream, req);
-            },
+        },
             requestVar);
 
         beast::error_code ec{};
 
-        auto returnResp =
-            [this, &forwarderStream](auto&& resp, beast::error_code& ec) {
+        auto returnResp = [this, &forwarderStream](auto&& resp,
+                                                   beast::error_code& ec) {
             checkFail(ec);
             streamBuilder.endStream(forwarderStream, ec);
             return resp;
@@ -223,7 +223,7 @@ struct CommonForwarderImpl : AbstractForwarder
         }
         return res0.release();
     }
-    VariantResponse operator()(VariantRequest& requestVar) const
+    VariantResponse operator()(VariantRequest&& requestVar) const
     {
         net::io_context ioContext;
         auto forwarderStream = streamBuilder.beginStream(ioContext, target,
@@ -232,13 +232,13 @@ struct CommonForwarderImpl : AbstractForwarder
             [&](auto&& req) {
             // Forward the request to the target server
             http::write(forwarderStream, req);
-            },
+        },
             requestVar);
 
         beast::error_code ec{};
 
-        auto returnResp =
-            [this, &forwarderStream](auto&& resp, beast::error_code& ec) {
+        auto returnResp = [this, &forwarderStream](auto&& resp,
+                                                   beast::error_code& ec) {
             checkFail(ec);
             streamBuilder.endStream(forwarderStream, ec);
             return resp;

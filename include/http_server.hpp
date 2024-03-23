@@ -113,7 +113,7 @@ struct HttpRouter
         std::cout << "reached not found";
         throw file_not_found(httpfunc.name());
     }
-    VariantResponse operator()(VariantRequest& req)
+    VariantResponse operator()(VariantRequest&& req)
     {
         return process_request(req);
     }
